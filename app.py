@@ -32,7 +32,7 @@ def extract_star_articles(soup, base_url: str, headers: dict):
         if link_href:
             article_info = {
                 'link': link_href,
-                'image': None,  # Since there is no image, set it to None
+                'imageLink': None,  # Since there is no image, set it to None
             }
 
             link_soup = fetch_article_data(link_href, headers)
@@ -102,7 +102,7 @@ def extract_nation_articles(soup, base_url: str, headers: dict):
                 if full_content:
                     article_info_list.append({
                         'link': link_href,
-                        'image': img_src,
+                        'imageLink': img_src,
                         'title': title,
                         'publication_time': pub_time,
                         'full-content': full_content
@@ -127,18 +127,19 @@ def get_all_articles():
 
     return all_articles
     
-headers = {
+headers_to_post = {
     'Content-Type': 'application/json',
     'src': 'vlj7s3cppx8e17n'
 }
 
-def process_with_groq_api(article_data_str):
+def process_with_groq_api(article):
     groq_api_key = api_key
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {groq_api_key}"
     }
+    article_data_str = json.dumps(article, indent=2)
     data = {
         "messages": [
             {"role": "system", "content": "You are a news reporter from ktechs communication organization"},
@@ -156,15 +157,15 @@ def process_with_groq_api(article_data_str):
     if response.status_code == 200:
         content = response.json()['choices'][0]['message']['content']
         payload = {
-            'title': 'no title',
+            'title': article.get('title')[:150] if article.get('title') else content[:100],
             'developer_id': 'vlj7s3cppx8e17n',
             'content': content,
             'sub_menu_list_id': 'bt1qckexcqmbust',
-            'tags': ['news','sports']
+            'tags': ['news','sports','politics']
         }
         api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
         try:
-            response = requests.post(api_url, json=payload, headers=headers)
+            response = requests.post(api_url, json=payload, headers=headers_to_post)
             response.raise_for_status()
             print("Data posted successfully for ai")
             
@@ -181,13 +182,12 @@ def post_data_to_api(data, api_url):
             'link': article.get('link')
         }
         try:
-            response = requests.post(api_url, json=payload, headers=headers)
+            response = requests.post(api_url, json=payload, headers=headers_to_post)
             response.raise_for_status()
             print(f"Data posted successfully for link: {article.get('link')}")
 
             # Stringify the article data and process with Groq API
-            article_data_str = json.dumps(article, indent=2)
-            process_with_groq_api(article_data_str)
+            process_with_groq_api(article)
         except requests.RequestException as e:
             print(f"Error posting data for link {article.get('link')}: {e}")
 

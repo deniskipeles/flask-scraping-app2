@@ -2,3 +2,4 @@ Flask
 Gunicorn
 markdownify
 beautifulsoup4
+requests

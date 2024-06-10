@@ -5,6 +5,10 @@ import time
 import json
 from flask import Flask, jsonify
 import threading
+import os
+
+# Get the value of the environment variable
+api_key = os.getenv('GROG_API_KEY')
 
 app = Flask(__name__)
 
@@ -124,7 +128,7 @@ def get_all_articles():
     return all_articles
 
 def process_with_groq_api(article_data_str):
-    groq_api_key = YOUR_API_KEY_HERE
+    groq_api_key = api_key
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",

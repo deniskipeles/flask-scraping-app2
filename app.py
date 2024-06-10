@@ -126,6 +126,11 @@ def get_all_articles():
         time.sleep(1)  # Delay to avoid overwhelming the website
 
     return all_articles
+    
+headers = {
+    'Content-Type': 'application/json',
+    'src': 'vlj7s3cppx8e17n'
+}
 
 def process_with_groq_api(article_data_str):
     groq_api_key = api_key
@@ -143,18 +148,33 @@ def process_with_groq_api(article_data_str):
         "temperature": 1,
         "max_tokens": 1024,
         "top_p": 1,
-        "stream": True,
+        "stream": False,
         "stop": None
     }
 
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
-        print(response.json())
+        content = response.json()['choices'][0]['message']['content']
+        payload = {
+            'title': 'no title',
+            'developer_id': 'vlj7s3cppx8e17n',
+            'content': content,
+            'sub_menu_list_id': 'bt1qckexcqmbust',
+            'tags': ['news','sports']
+        }
+        api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
+        try:
+            response = requests.post(api_url, json=payload, headers=headers)
+            response.raise_for_status()
+            print("Data posted successfully for ai")
+            
+        except requests.RequestException as e:
+            print(f"Error posting data for ai: {e}")
+
     else:
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
 
 def post_data_to_api(data, api_url):
-    headers = {'Content-Type': 'application/json'}
     for article in data:
         payload = {
             'data': article,

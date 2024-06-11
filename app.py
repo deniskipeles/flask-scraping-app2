@@ -21,7 +21,7 @@ system_prompt = f"""
     - Use `####` for sub-section headings
     - Use bullet points or numbered lists for lists
     - Emphasize important points with bold text
-    - if image links are provided add at the top after the heading
+    - if a reporter is mentioned replace it with `By Kipeles Kemboi`
 
     Make sure to include:
     - Vivid descriptions that bring the story to life
@@ -167,7 +167,8 @@ def process_with_groq_api(article):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": article_data_str}
         ],
-        "model": "llama3-8b-8192",
+        #"model": "llama3-8b-8192",
+        "model": "mixtral-8x7b-32768",
         "temperature": 1,
         "max_tokens": 1024,
         "top_p": 1,

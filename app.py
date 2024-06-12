@@ -34,6 +34,47 @@ system_prompt = f"""
 
 app = Flask(__name__)
 
+
+def get_sports_content(url: str):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    stories = []
+    for li in soup.find_all('li'):
+        title_element = li.find('h1') or li.find('a')
+        excerpt_element = li.find('p')
+        image_element = li.find('img')
+        link = title_element.get('href') if title_element else None
+
+        if link and not link.startswith('http'):
+            link = urljoin(url, link)
+
+        story = {
+            'title': title_element.get_text() if title_element else li.get_text(),
+            'link': link,
+            'excerpt': excerpt_element.get_text() if excerpt_element else None,
+            'imageLink': image_element.get('src') if image_element else None
+        }
+
+        if story['excerpt'] and story['imageLink'] and story['link']:
+            stories.append(story)
+
+    # Function to get full content from a link
+    def get_full_content(link):
+        if not link:
+            return None
+
+        response = requests.get(link)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        content_element = soup.find(class_='the-content') or soup.find('article')
+        return content_element.get_text() if content_element else None
+
+    # Add full-content to each story
+    for story in stories:
+        story['full-content'] = get_full_content(story['link'])
+
+    return stories
+
 def fetch_article_data(url: str, headers: dict):
     try:
         response = requests.get(url, headers=headers)
@@ -222,6 +263,19 @@ def background_task():
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
     post_data_to_api(all_articles, api_url)
 
+def background_task_sports():
+    # Fetch all articles from the source
+    stories = get_sports_content("https://www.goal.com")
+
+    # Post the articles to the specified API endpoint
+    api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
+    post_data_to_api(all_articles, api_url)
+    
+@app.route('/sports', methods=['GET'])
+def scan():
+    threading.Thread(target=background_task_sports).start()
+    return jsonify({"message": "Scraping initialized"}), 202
+    
 @app.route('/scan', methods=['GET'])
 def scan():
     threading.Thread(target=background_task).start()

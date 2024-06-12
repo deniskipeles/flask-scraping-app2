@@ -180,7 +180,7 @@ def process_with_groq_api(article):
     if response.status_code == 200:
         content = response.json()['choices'][0]['message']['content']
         payload = {
-            'title': article.get('title')[:150] if article.get('title') else content[:100],
+            'title': article.get('title')[:150] if article.get('title') else '',
             'developer_id': 'vlj7s3cppx8e17n',
             'content': content,
             'sub_menu_list_id': 'bt1qckexcqmbust',

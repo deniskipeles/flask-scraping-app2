@@ -13,23 +13,32 @@ api_key = os.getenv('GROG_API_KEY')
 current_time = datetime.now().strftime("%B %d, %Y at %H:%M %p")
 
 system_prompt = f"""
-    You are a news reporter(Denis Kipeles Kemboi) at Ktechs communication organization designed to provide detailed, accurate, and timely news reports. The current date and time is {current_time}. Your goal is to produce engaging and dynamic content that captures the reader's attention. Expand on the given context with comprehensive details, including background information, key facts, human interest elements, and different perspectives. Ensure that your report is well-structured, clear, and adheres to journalistic standards of accuracy and impartiality.
+    You are a news reporter (Denis Kipeles Kemboi) at Ktechs Communication Organization, designed to provide detailed, accurate, and timely news reports. The current date and time is {current_time}. Your goal is to produce engaging and dynamic content that captures the reader's attention. Expand on the given context with comprehensive details, including background information, key facts, human interest elements, and different perspectives. Ensure that your report is well-structured, clear, and adheres to journalistic standards of accuracy and impartiality.
 
-    Format the report with markdown for proper styling:
+    Use markdown for styling:
     - Use `##` for the main headline
     - Use `###` for section headings
     - Use `####` for sub-section headings
     - Use bullet points or numbered lists for lists
-    - Emphasize important points with bold text
-    - if a reporter is mentioned replace it with `By Kipeles Kemboi`
+    - Emphasize important points with **bold text**
+    - Use quotes for citations and quotes
+    - Ensure proper paragraph breaks and formatting for readability
 
-    Make sure to include:
+    
+    Ensure the content includes:
     - Vivid descriptions that bring the story to life
     - Quotes from experts, officials, or eyewitnesses
     - Insightful analysis and context
     - Human interest elements that add a personal touch
 
-    Your reports should be formatted with a headline, an introductory paragraph summarizing the key points, followed by detailed sections elaborating on different aspects of the story.
+    Your reports should be structured as follows:
+    - A headline
+    - An introductory paragraph summarizing the key points
+    - Detailed sections elaborating on different aspects of the story
+    
+    You should Mark the title and tags clearly for extraction (do not wrap them with markdown):
+    - {{title}}Generated Title{{/title}}
+    - {{tags}}tag1, tag2, tag3{{/tags}}
 """
 
 app = Flask(__name__)
@@ -195,6 +204,8 @@ headers_to_post = {
     'src': 'vlj7s3cppx8e17n'
 }
 
+# Other functions (fetch_article_data, extract_star_articles, extract_citizen_articles, extract_nation_articles, get_all_articles, etc.) remain the same
+
 def process_with_groq_api(article):
     groq_api_key = api_key
     url = "https://api.groq.com/openai/v1/chat/completions"
@@ -208,7 +219,6 @@ def process_with_groq_api(article):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": article_data_str}
         ],
-        #"model": "llama3-8b-8192",
         "model": "mixtral-8x7b-32768",
         "temperature": 1,
         "max_tokens": 1024,
@@ -220,24 +230,46 @@ def process_with_groq_api(article):
     response = requests.post(url, headers=headers, json=data)
     if response.status_code == 200:
         content = response.json()['choices'][0]['message']['content']
+        title = extract_field(content, 'title')
+        tags = extract_field(content, 'tags').split(', ')
+        content_text = remove_markers(content)
+
         payload = {
-            'title': article.get('title')[:150] if article.get('title') else '',
+            'title': title if len(title) > 0 else article.get('title'),
             'developer_id': 'vlj7s3cppx8e17n',
-            'content': content,
+            'content': content_text,
             'sub_menu_list_id': 'bt1qckexcqmbust',
-            'tags': ['news','sports','politics']
+            'tags': tags if len(tags) > 1 else ['news','sports','politics']
         }
         api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
         try:
             response = requests.post(api_url, json=payload, headers=headers_to_post)
             response.raise_for_status()
-            print("Data posted successfully for ai")
-            
+            print("Data posted successfully for AI")
+
         except requests.RequestException as e:
-            print(f"Error posting data for ai: {e}")
+            print(f"Error posting data for AI: {e}")
 
     else:
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
+
+def extract_field(content, field):
+    start_marker = f'{{{field}}}'
+    end_marker = f'{{/{field}}}'
+    start_index = content.find(start_marker) + len(start_marker)
+    end_index = content.find(end_marker)
+    title = content[start_index:end_index].strip() if start_index < end_index else ''
+    return title.replace('*','')
+
+def remove_markers(content):
+    markers = ['title', 'tags']
+    for marker in markers:
+        start_marker = f'{{{marker}}}'
+        end_marker = f'{{/{marker}}}'
+        start_index = content.find(start_marker)
+        end_index = content.find(end_marker) + len(end_marker)
+        content = content.replace(content[start_index:end_index], '')
+    return content
 
 def post_data_to_api(data, api_url):
     for article in data:
@@ -269,12 +301,12 @@ def background_task_sports():
 
     # Post the articles to the specified API endpoint
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
-    post_data_to_api(all_articles, api_url)
+    post_data_to_api(stories, api_url)
     
 @app.route('/sports', methods=['GET'])
-def scan():
+def scan_sports():
     threading.Thread(target=background_task_sports).start()
-    return jsonify({"message": "Scraping initialized"}), 202
+    return jsonify({"message": "Sports scraping initialized"}), 202
     
 @app.route('/scan', methods=['GET'])
 def scan():
@@ -284,3 +316,5 @@ def scan():
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
+
+

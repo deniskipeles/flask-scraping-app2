@@ -62,7 +62,8 @@ def get_sports_content(url: str):
             'title': title_element.get_text() if title_element else li.get_text(),
             'link': link,
             'excerpt': excerpt_element.get_text() if excerpt_element else None,
-            'imageLink': image_element.get('src') if image_element else None
+            'imageLink': image_element.get('src') if image_element else None,
+            'sports':True
         }
 
         if story['excerpt'] and story['imageLink'] and story['link']:
@@ -238,7 +239,7 @@ def process_with_groq_api(article):
             'title': title if len(title) > 0 else article.get('title'),
             'developer_id': 'vlj7s3cppx8e17n',
             'content': content_text,
-            'sub_menu_list_id': 'bt1qckexcqmbust',
+            'sub_menu_list_id': 'b8901yq11qqka1y' if article.get('sports') else 'bt1qckexcqmbust',
             'tags': tags if len(tags) > 1 else ['news','sports','politics']
         }
         api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'

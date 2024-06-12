@@ -253,6 +253,8 @@ def process_with_groq_api(article):
 
     else:
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
+        print("Waiting for 20 seconds before retrying...")
+        time.sleep(20)
 
 def extract_field(content, field):
     start_marker = f'{{{field}}}'
@@ -285,6 +287,8 @@ def post_data_to_api(data, api_url):
 
             # Stringify the article data and process with Groq API
             process_with_groq_api(article)
+            # Delay next process by 5 seconds
+            time.sleep(5)
         except requests.RequestException as e:
             print(f"Error posting data for link {article.get('link')}: {e}")
 

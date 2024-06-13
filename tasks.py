@@ -1,4 +1,4 @@
-#tasks.py
+# tasks.py file
 import requests
 import time
 from rq import Queue
@@ -98,16 +98,16 @@ def post_data_to_api(article, api_url, headers_to_post):
     try:
         response = requests.post(api_url, json=payload, headers=headers_to_post)
         response.raise_for_status()
+        queue_groq.enqueue(process_with_groq_api, article)
         print(f"Data posted successfully for link: {article.get('link')}")
     except RequestException as e:
         print(f"Error posting data for link {article.get('link')}: {e}")
-        print("Retrying in 3 seconds...")
-        time.sleep(3)
+        print("Retrying in 1 second...")
+        time.sleep(1)
         queue_post.enqueue(post_data_to_api, article, api_url, headers_to_post)
 
 def add_to_queue(data, api_url, headers_to_post):
     for article in data:
-        queue_groq.enqueue(process_with_groq_api, article)
         queue_post.enqueue(post_data_to_api, article, api_url, headers_to_post)
 
 def extract_field(content, field):

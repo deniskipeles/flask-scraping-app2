@@ -1,20 +1,21 @@
+# Use the official Python image from Docker Hub
 FROM python:3.9-slim
 
-# Set working directory to /app
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy requirements file
+# Copy the requirements.txt file first
 COPY requirements.txt .
 
-# Install dependencies
+# Install Python dependencies from requirements.txt
 RUN pip install -r requirements.txt
 
-# Copy application code
+# Copy all files from the current directory into the container's /app directory
 COPY . .
 
-# Expose port 5000 for Flask app
+# Expose port 5000 to the outside world
 EXPOSE 5000
 
-# Start RQ workers
-CMD ["rq", "worker", "-w", "4", "groq", "post"] && \
-    gunicorn -w 4 app:app
+# Set the command to run when the container starts
+CMD ["./start.sh"]
+

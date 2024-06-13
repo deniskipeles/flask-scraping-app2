@@ -1,12 +1,17 @@
 import requests
 import time
 from rq import Queue
-from redis import Redis
+import redis
 from requests.exceptions import RequestException
 import os
+import datetime
+import json
 
-# Initialize Redis connection
-redis_conn = Redis()
+# Redis connection URL
+redis_url = 'redis://red-cplhati1hbls73ef82gg:6379'
+
+# Establish a connection to Redis
+redis_conn = redis.from_url(redis_url)
 
 # Define two queues: one for Groq processing and one for posting data
 queue_groq = Queue('groq', connection=redis_conn)
@@ -20,7 +25,7 @@ def process_with_groq_api(article, retries=5):
         "Authorization": f"Bearer {api_key}"
     }
     system_prompt = f"""
-        You are a news reporter (Denis Kipeles Kemboi) at Ktechs communication organization designed to provide detailed, accurate, and timely news reports. The current date and time is {datetime.now().strftime('%B %d, %Y at %H:%M %p')}. Your goal is to produce engaging and dynamic content that captures the reader's attention. Expand on the given context with comprehensive details, including background information, key facts, human interest elements, and different perspectives. Ensure that your report is well-structured, clear, and adheres to journalistic standards of accuracy and impartiality.
+        You are a news reporter (Denis Kipeles Kemboi) at Ktechs media department designed to provide detailed, accurate, and timely news reports. The current date and time is {datetime.datetime.now().isoformat()}. Your goal is to produce engaging and dynamic content that captures the reader's attention. Expand on the given context with comprehensive details, including background information, key facts, human interest elements, and different perspectives. Ensure that your report is well-structured, clear, and adheres to journalistic standards of accuracy and impartiality.
 
         Use markdown for styling:
         - Use `##` for the main headline
@@ -103,4 +108,22 @@ def add_to_queue(data, api_url, headers_to_post):
     for article in data:
         queue_groq.enqueue(process_with_groq_api, article)
         queue_post.enqueue(post_data_to_api, article, api_url, headers_to_post)
+
+def extract_field(content, field):
+    start_marker = f'{{{field}}}'
+    end_marker = f'{{/{field}}}'
+    start_index = content.find(start_marker) + len(start_marker)
+    end_index = content.find(end_marker)
+    title = content[start_index:end_index].strip() if start_index < end_index else ''
+    return title.replace('*','')
+
+def remove_markers(content):
+    markers = ['title', 'tags']
+    for marker in markers:
+        start_marker = f'{{{marker}}}'
+        end_marker = f'{{/{marker}}}'
+        start_index = content.find(start_marker)
+        end_index = content.find(end_marker) + len(end_marker)
+        content = content.replace(content[start_index:end_index], '')
+    return content
 

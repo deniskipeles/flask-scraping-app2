@@ -1,5 +1,7 @@
 Flask
 Gunicorn
 markdownify
-beautifulsoup4
+redis
+rq
 requests
+beautifulsoup4

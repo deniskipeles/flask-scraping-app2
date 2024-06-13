@@ -103,7 +103,7 @@ def post_data_to_api(article, api_url, headers_to_post):
         print(f"Error posting data for link {article.get('link')}: {e}")
         print("Retrying in 1 second...")
         time.sleep(1)
-        queue_post.enqueue(post_data_to_api, article, api_url, headers_to_post)
+        #queue_post.enqueue(post_data_to_api, article, api_url, headers_to_post)
 
 def add_to_queue(data, api_url, headers_to_post):
     for article in data:

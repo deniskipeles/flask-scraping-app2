@@ -1,4 +1,3 @@
-# tasks.py file
 import requests
 import time
 from rq import Queue
@@ -19,7 +18,7 @@ queue_groq = Queue('groq', connection=redis_conn)
 queue_post = Queue('post', connection=redis_conn)
 
 def process_with_groq_api(article, retries=5):
-    api_key = os.getenv('GROQ_API_KEY')  # Replace with your actual API key
+    api_key = os.getenv('GROQ_API_KEY')
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -34,7 +33,7 @@ def process_with_groq_api(article, retries=5):
         - Use `####` for sub-section headings
         - Use bullet points or numbered lists for lists
         - Emphasize important points with **bold text**
-        - Use quotes for citations and quotes
+                - Use quotes for citations and quotes
         - Ensure proper paragraph breaks and formatting for readability
 
         Mark the title and tags clearly for extraction don't wrap with markdown the title and tags:
@@ -128,3 +127,4 @@ def remove_markers(content):
         content = content.replace(content[start_index:end_index], '')
     return content
 
+        

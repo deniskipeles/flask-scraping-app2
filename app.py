@@ -1,20 +1,15 @@
-# app.py file
+# app.py
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import time
 import json
 from flask import Flask, jsonify
-import threading
 import os
 from datetime import datetime
-
-from tasks import add_to_queue, redis_conn, queue_groq, queue_post
- 
-    
+from tasks import add_to_queue, queue_post
 
 app = Flask(__name__)
-
 
 def get_sports_content(url: str):
     response = requests.get(url)
@@ -35,13 +30,12 @@ def get_sports_content(url: str):
             'link': link,
             'excerpt': excerpt_element.get_text() if excerpt_element else None,
             'imageLink': image_element.get('src') if image_element else None,
-            'sports':True
+            'sports': True
         }
 
         if story['excerpt'] and story['imageLink'] and story['link']:
             stories.append(story)
 
-    # Function to get full content from a link
     def get_full_content(link):
         if not link:
             return None
@@ -51,7 +45,6 @@ def get_sports_content(url: str):
         content_element = soup.find(class_='the-content') or soup.find('article')
         return content_element.get_text() if content_element else None
 
-    # Add full-content to each story
     for story in stories:
         story['full-content'] = get_full_content(story['link'])
 
@@ -77,7 +70,7 @@ def extract_star_articles(soup, base_url: str, headers: dict):
         if link_href:
             article_info = {
                 'link': link_href,
-                'imageLink': None,  # Since there is no image, set it to None
+                'imageLink': None
             }
 
             link_soup = fetch_article_data(link_href, headers)
@@ -171,39 +164,36 @@ def get_all_articles():
         time.sleep(1)  # Delay to avoid overwhelming the website
 
     return all_articles
-    
+
 headers_to_post = {
     'Content-Type': 'application/json',
     'src': 'vlj7s3cppx8e17n'
 }
 
 def background_task():
-    # Fetch all articles from the three sources
     all_articles = get_all_articles()
-
-    # Post the articles to the specified API endpoint
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
-    add_to_queue(all_articles, api_url,headers_to_post)
+    add_to_queue(all_articles, api_url, headers_to_post)
 
 def background_task_sports():
-    # Fetch all articles from the source
     stories = get_sports_content("https://www.goal.com")
-
-    # Post the articles to the specified API endpoint
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
-    add_to_queue(stories, api_url,headers_to_post)
+    add_to_queue(stories, api_url, headers_to_post)
 
 @app.route('/sports', methods=['GET'])
 def scan_sports():
-    job = post_queue.enqueue(background_task_sports)
+    job = queue_post.enqueue(background_task_sports)
     return jsonify({"message": "Sports scraping initialized", "job_id": job.get_id()}), 202
 
 @app.route('/scan', methods=['GET'])
 def scan():
-    job = post_queue.enqueue(background_task)
+    job = queue_post.enqueue(background_task)
     return jsonify({"message": "Scraping initialized", "job_id": job.get_id()}), 202
 
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
+
+if __name__ == '__main__':
+    app.run()
 

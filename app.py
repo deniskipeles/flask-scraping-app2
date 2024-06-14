@@ -207,7 +207,7 @@ headers_to_post = {
 
 # Other functions (fetch_article_data, extract_star_articles, extract_citizen_articles, extract_nation_articles, get_all_articles, etc.) remain the same
 
-def process_with_groq_api(article):
+def process_with_groq_api(article, model="mixtral-8x7b-32768"):
     groq_api_key = api_key
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -220,7 +220,7 @@ def process_with_groq_api(article):
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": article_data_str}
         ],
-        "model": "mixtral-8x7b-32768",
+        "model": model,
         "temperature": 1,
         "max_tokens": 1024,
         "top_p": 1,
@@ -255,7 +255,7 @@ def process_with_groq_api(article):
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
         print("Waiting for 20 seconds before retrying...")
         time.sleep(20)
-        process_with_groq_api(article)
+        process_with_groq_api(article, "llama3-8b-8192")
 
 def extract_field(content, field):
     start_marker = f'{{{field}}}'

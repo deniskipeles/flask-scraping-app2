@@ -1,15 +1,48 @@
-# app.py
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 import time
 import json
 from flask import Flask, jsonify
+import threading
 import os
 from datetime import datetime
-from tasks import add_to_queue, queue_post
+
+# Get the value of the environment variable
+api_key = os.getenv('GROG_API_KEY')
+current_time = datetime.now().strftime("%B %d, %Y at %H:%M %p")
+
+system_prompt = f"""
+    You are a news reporter (Denis Kipeles Kemboi) at Ktechs Communication Organization, designed to provide detailed, accurate, and timely news reports. The current date and time is {current_time}. Your goal is to produce engaging and dynamic content that captures the reader's attention. Expand on the given context with comprehensive details, including background information, key facts, human interest elements, and different perspectives. Ensure that your report is well-structured, clear, and adheres to journalistic standards of accuracy and impartiality.
+
+    Use markdown for styling:
+    - Use `##` for the main headline
+    - Use `###` for section headings
+    - Use `####` for sub-section headings
+    - Use bullet points or numbered lists for lists
+    - Emphasize important points with **bold text**
+    - Use quotes for citations and quotes
+    - Ensure proper paragraph breaks and formatting for readability
+
+    
+    Ensure the content includes:
+    - Vivid descriptions that bring the story to life
+    - Quotes from experts, officials, or eyewitnesses
+    - Insightful analysis and context
+    - Human interest elements that add a personal touch
+
+    Your reports should be structured as follows:
+    - A headline
+    - An introductory paragraph summarizing the key points
+    - Detailed sections elaborating on different aspects of the story
+    
+    You should Mark the title and tags clearly for extraction (do not wrap them with markdown):
+    - {{title}}Generated Title{{/title}}
+    - {{tags}}tag1, tag2, tag3{{/tags}}
+"""
 
 app = Flask(__name__)
+
 
 def get_sports_content(url: str):
     response = requests.get(url)
@@ -30,12 +63,13 @@ def get_sports_content(url: str):
             'link': link,
             'excerpt': excerpt_element.get_text() if excerpt_element else None,
             'imageLink': image_element.get('src') if image_element else None,
-            'sports': True
+            'sports':True
         }
 
         if story['excerpt'] and story['imageLink'] and story['link']:
             stories.append(story)
 
+    # Function to get full content from a link
     def get_full_content(link):
         if not link:
             return None
@@ -45,6 +79,7 @@ def get_sports_content(url: str):
         content_element = soup.find(class_='the-content') or soup.find('article')
         return content_element.get_text() if content_element else None
 
+    # Add full-content to each story
     for story in stories:
         story['full-content'] = get_full_content(story['link'])
 
@@ -70,7 +105,7 @@ def extract_star_articles(soup, base_url: str, headers: dict):
         if link_href:
             article_info = {
                 'link': link_href,
-                'imageLink': None
+                'imageLink': None,  # Since there is no image, set it to None
             }
 
             link_soup = fetch_article_data(link_href, headers)
@@ -164,36 +199,129 @@ def get_all_articles():
         time.sleep(1)  # Delay to avoid overwhelming the website
 
     return all_articles
-
+    
 headers_to_post = {
     'Content-Type': 'application/json',
     'src': 'vlj7s3cppx8e17n'
 }
 
+# Other functions (fetch_article_data, extract_star_articles, extract_citizen_articles, extract_nation_articles, get_all_articles, etc.) remain the same
+
+def process_with_groq_api(article):
+    groq_api_key = api_key
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {groq_api_key}"
+    }
+    article_data_str = json.dumps(article, indent=2)
+    data = {
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": article_data_str}
+        ],
+        "model": "mixtral-8x7b-32768",
+        "temperature": 1,
+        "max_tokens": 1024,
+        "top_p": 1,
+        "stream": False,
+        "stop": None
+    }
+
+    response = requests.post(url, headers=headers, json=data)
+    if response.status_code == 200:
+        content = response.json()['choices'][0]['message']['content']
+        title = extract_field(content, 'title')
+        tags = extract_field(content, 'tags').split(', ')
+        content_text = remove_markers(content)
+
+        payload = {
+            'title': title if len(title) > 0 else article.get('title'),
+            'developer_id': 'vlj7s3cppx8e17n',
+            'content': content_text,
+            'sub_menu_list_id': 'b8901yq11qqka1y' if article.get('sports') else 'bt1qckexcqmbust',
+            'tags': tags if len(tags) > 1 else ['news','sports','politics']
+        }
+        api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
+        try:
+            response = requests.post(api_url, json=payload, headers=headers_to_post)
+            response.raise_for_status()
+            print("Data posted successfully for AI")
+
+        except requests.RequestException as e:
+            print(f"Error posting data for AI: {e}")
+
+    else:
+        print(f"Error processing with Groq API: {response.status_code} - {response.text}")
+        print("Waiting for 20 seconds before retrying...")
+        time.sleep(20)
+        process_with_groq_api(article)
+
+def extract_field(content, field):
+    start_marker = f'{{{field}}}'
+    end_marker = f'{{/{field}}}'
+    start_index = content.find(start_marker) + len(start_marker)
+    end_index = content.find(end_marker)
+    title = content[start_index:end_index].strip() if start_index < end_index else ''
+    return title.replace('*','')
+
+def remove_markers(content):
+    markers = ['title', 'tags']
+    for marker in markers:
+        start_marker = f'{{{marker}}}'
+        end_marker = f'{{/{marker}}}'
+        start_index = content.find(start_marker)
+        end_index = content.find(end_marker) + len(end_marker)
+        content = content.replace(content[start_index:end_index], '')
+    return content
+
+def post_data_to_api(data, api_url):
+    for article in data:
+        payload = {
+            'data': article,
+            'link': article.get('link')
+        }
+        try:
+            response = requests.post(api_url, json=payload, headers=headers_to_post)
+            response.raise_for_status()
+            print(f"Data posted successfully for link: {article.get('link')}")
+
+            # Stringify the article data and process with Groq API
+            process_with_groq_api(article)
+            # Delay next process by 1 seconds
+            time.sleep(1)
+        except requests.RequestException as e:
+            print(f"Error posting data for link {article.get('link')}: {e}")
+
 def background_task():
+    # Fetch all articles from the three sources
     all_articles = get_all_articles()
+
+    # Post the articles to the specified API endpoint
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
-    add_to_queue(all_articles, api_url, headers_to_post)
+    post_data_to_api(all_articles, api_url)
 
 def background_task_sports():
+    # Fetch all articles from the source
     stories = get_sports_content("https://www.goal.com")
-    api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
-    add_to_queue(stories, api_url, headers_to_post)
 
+    # Post the articles to the specified API endpoint
+    api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
+    post_data_to_api(stories, api_url)
+    
 @app.route('/sports', methods=['GET'])
 def scan_sports():
-    job = queue_post.enqueue(background_task_sports)
-    return jsonify({"message": "Sports scraping initialized", "job_id": job.get_id()}), 202
-
+    threading.Thread(target=background_task_sports).start()
+    return jsonify({"message": "Sports scraping initialized"}), 202
+    
 @app.route('/scan', methods=['GET'])
 def scan():
-    job = queue_post.enqueue(background_task)
-    return jsonify({"message": "Scraping initialized", "job_id": job.get_id()}), 202
+    threading.Thread(target=background_task).start()
+    return jsonify({"message": "Scraping initialized"}), 202
 
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
 
-if __name__ == '__main__':
-    app.run()
+
 

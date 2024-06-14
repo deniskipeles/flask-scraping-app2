@@ -44,6 +44,58 @@ system_prompt = f"""
 app = Flask(__name__)
 
 
+
+
+def get_hollywood_content(url: str) -> list:
+    """
+    Retrieves the page content from the given URL.
+
+    Args:
+    url (str): The URL to retrieve the page content from.
+
+    Returns:
+    list: A list of dictionaries containing the story information.
+    """
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+
+    stories = []
+    for li in soup.find_all('div', {'class': 'homepage-story'}):
+        title_element = li.find('h3', {'class': 'c-title'})
+        link = li.find('a', {'class': 'lrv-a-unstyle-link'}).get('href')
+
+        if link and not link.startswith('http'):
+            link = urljoin(url, link)
+
+        story = {
+            'title': title_element.get_text() if title_element else li.get_text(),
+            'link': link,
+            'hollywood':True,
+            'excerpt': None,
+            'imageLink': None
+        }
+
+        if story['title'] and story['link']:
+            stories.append(story)
+
+    # Function to get full content from a link
+    def get_full_content(link):
+        if not link:
+            return None
+
+        response = requests.get(link)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        content_element = soup.find(class_='the-content') or soup.find('article')
+        img = content_element.find('img').get('src') if content_element.find('img') else None
+        content = content_element.get_text() if content_element else None
+        return {'imageLink': img, 'content': content}
+
+    # Add full-content to each story
+    for story in stories:
+        story.update(get_full_content(story['link']))
+
+    return stories
+
 def get_sports_content(url: str):
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
@@ -235,11 +287,18 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
         tags = extract_field(content, 'tags').split(', ')
         content_text = remove_markers(content)
 
+        article_value = 'bt1qckexcqmbust'
+        if article.get('hollywood'):
+            article_value = '0z9aqu2zdi0jv9i'
+        elif article.get('sports'):
+            article_value = 'b8901yq11qqka1y'
+        else:
+            article_value = 'bt1qckexcqmbust'
         payload = {
             'title': title if len(title) > 0 else article.get('title'),
             'developer_id': 'vlj7s3cppx8e17n',
             'content': content_text,
-            'sub_menu_list_id': 'b8901yq11qqka1y' if article.get('sports') else 'bt1qckexcqmbust',
+            'sub_menu_list_id': article_value,
             'tags': tags if len(tags) > 1 else ['news','sports','politics']
         }
         api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
@@ -300,6 +359,8 @@ def background_task():
     # Post the articles to the specified API endpoint
     api_url = "https://full-bit.pockethost.io/api/collections/scrape_data/records"
     post_data_to_api(all_articles, api_url)
+    hollywood_articles = get_hollywood_content("https://www.hollywoodreporter.com/")
+    post_data_to_api(hollywood_articles, api_url)
 
 def background_task_sports():
     # Fetch all articles from the source

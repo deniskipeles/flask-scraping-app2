@@ -253,9 +253,9 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
 
     else:
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
-        print("Waiting for 20 seconds before retrying...")
-        time.sleep(20)
-        process_with_groq_api(article, "llama3-8b-8192")
+        print("Waiting for 5 seconds before retrying...")
+        time.sleep(5)
+        process_with_groq_api(article, "llama3-70b-8192")
 
 def extract_field(content, field):
     start_marker = f'{{{field}}}'

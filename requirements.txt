@@ -2,6 +2,6 @@ Flask
 Gunicorn
 markdownify
 redis
-rq
+pika
 requests
 beautifulsoup4

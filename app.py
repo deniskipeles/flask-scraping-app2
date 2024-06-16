@@ -47,14 +47,7 @@ def stop_consumer():
         consumer_thread = None
 
     return jsonify({"status": "Consumer stopped"}), 200
-            
-
-
-@app.route('/scan', methods=['GET'])
-def scan():
-    threading.Thread(target=background_task).start()
-    return jsonify({"message": "Scraping initialized"}), 202
-
+    
 @app.route('/')
 def hello_world():
     return 'Hello, World!'

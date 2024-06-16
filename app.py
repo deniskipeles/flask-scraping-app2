@@ -20,7 +20,7 @@ def run_consumer():
     finally:
         consumer_running = False
 
-@app.route('/start-consumer', methods=['POST'])
+@app.route('/start-consumer')
 def start_consumer():
     global consumer_running
 
@@ -31,7 +31,7 @@ def start_consumer():
     consumer_thread.start()
     return jsonify({"status": "Consumer starting"}), 200
 
-@app.route('/stop-consumer', methods=['POST'])
+@app.route('/stop-consumer')
 def stop_consumer():
     global consumer_running
 
@@ -56,7 +56,7 @@ def run_scan_and_consumer():
     if not consumer_running:
         run_consumer()
 
-@app.route('/scan', methods=['POST'])
+@app.route('/scan')
 def scan_and_start_consumer():
     global consumer_running
 

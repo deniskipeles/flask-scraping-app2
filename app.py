@@ -1,19 +1,16 @@
-
 from flask import Flask, jsonify
 import threading
-import time
 import logging
-from processor import consumer
+from processor import consumer, consumer_running
 
 app = Flask(__name__)
 
-# Global variable to track consumer status
-consumer_running = False
+# Global variables to track consumer status
 consumer_thread = None
 
 @app.route('/start-consumer', methods=['POST'])
 def start_consumer():
-    global consumer_running, consumer_thread
+    global consumer_thread, consumer_running
     
     if consumer_running:
         return jsonify({"status": "Consumer is already running"}), 200
@@ -28,6 +25,7 @@ def run_consumer():
     global consumer_running
 
     try:
+        consumer_running = True
         consumer()
     except Exception as e:
         logging.error(f"Error in consumer: {e}")
@@ -36,7 +34,7 @@ def run_consumer():
 
 @app.route('/stop-consumer', methods=['POST'])
 def stop_consumer():
-    global consumer_running, consumer_thread
+    global consumer_thread, consumer_running
 
     if not consumer_running:
         return jsonify({"status": "Consumer is not running"}), 200
@@ -47,7 +45,8 @@ def stop_consumer():
         consumer_thread = None
 
     return jsonify({"status": "Consumer stopped"}), 200
-    
+
+
 @app.route('/')
 def hello_world():
     return 'Hello, World!'

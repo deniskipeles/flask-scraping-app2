@@ -11,6 +11,8 @@ from config import GROQ_API_KEY, HEADERS_TO_POST, TEMP_API_URL, params, redis_cl
 from fetcher import fetch_and_cache, fetch_article_data, find_element, find_elements
 from json_utils import extract_json_data
 
+from urllib.parse import urljoin
+
 
 def generate_title_summary_tags(content, system_prompt_tst, model="gemma-7b-it"):
     print('gen tags called')

@@ -230,10 +230,10 @@ def scrape_data(scrape_configuration):
                 'processor': scrape_configuration['id'],
                 'developer_id': scrape_configuration['author_id']
             }
-            print(obj)
+            #print(obj)
             if content and len(content) > 100:
                 results.append(obj)
-                logging.info(f"Scraped data: {obj}")
+                logging.info(f"Scraped data: {obj['title']}")
                 post_data_to_api([obj])
             else:
                 logging.info("Content is too short, skipping...")

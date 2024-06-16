@@ -131,13 +131,17 @@ def get_data_api(article_id):
     except requests.RequestException as e:
         logging.error(f"Error posting data for link {article_id}: {e}")
 
+
+consumer_running = False
 def consumer():
+    global consumer_running
+
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
     channel.queue_declare(queue='hello')
 
     start_time = time.time()
-    while True:
+    while consumer_running:
         method_frame, header_frame, body = channel.basic_get(queue='hello')
         if method_frame:
             print(f"Received {body}")
@@ -149,6 +153,9 @@ def consumer():
         time.sleep(1)
 
     connection.close()
+    consumer_running = False  # Ensure the flag is reset when consumer stops
+
+
 
 def post_data_to_api(data):
     for article in data:

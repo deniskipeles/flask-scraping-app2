@@ -42,22 +42,32 @@ def stop_consumer():
     return jsonify({"status": "Consumer stopping"}), 200
 
 def run_scan_and_consumer():
+    global consumer_running
+
     # Initiate scraping process
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
     data = fetch_and_cache(url)
     if data:
         for scraper_config in data['items']:
-            #print(scraper_config)
+            print(scraper_config)
             scrape_data(scraper_config)
 
-    # Start the consumer after scraping is complete
-    run_consumer()
+    # Check if the consumer is already running before starting it
+    if not consumer_running:
+        run_consumer()
 
 @app.route('/scan', methods=['POST'])
 def scan_and_start_consumer():
+    global consumer_running
+
+    if consumer_running:
+        return jsonify({"status": "Consumer is already running, initiating scan"}), 200
+
     scan_thread = threading.Thread(target=run_scan_and_consumer)
     scan_thread.start()
-    return jsonify({"status": "Scan initiated and consumer will start"}), 200
+    return jsonify({"status": "Scan initiated and consumer will start if not already running"}), 200
+
+
 
 @app.route('/')
 def hello_world():

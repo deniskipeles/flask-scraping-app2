@@ -47,7 +47,7 @@ def run_scan_and_consumer():
     data = fetch_and_cache(url)
     if data:
         for scraper_config in data['items']:
-            print(scraper_config)
+            #print(scraper_config)
             scrape_data(scraper_config)
 
     # Start the consumer after scraping is complete

@@ -243,10 +243,11 @@ def scrape_data(scrape_configuration):
                 'developer_id': scrape_configuration['author_id']
             }
             #print(obj)
-            if content and len(content) > 100:
+            if content and len(content) > 500:
                 results.append(obj)
                 logging.info(f"Scraped data: {obj['title']}")
                 post_data_to_api([obj])
             else:
                 logging.info("Content is too short, skipping...")
+                redis_client.setex(obj['link'], 7200, 'ban')
     return results

@@ -135,8 +135,8 @@ def get_data_api(article_id):
 
 
 consumer_running = False
-def consumer():
-    global consumer_running
+def consumer(consumer_running=True):
+    #global consumer_running
 
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
@@ -152,7 +152,7 @@ def consumer():
             start_time = time.time()
         elif time.time() - start_time > 10:
             break
-        time.sleep(1)
+        time.sleep(3)
 
     connection.close()
     consumer_running = False  # Ensure the flag is reset when consumer stops

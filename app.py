@@ -16,7 +16,7 @@ def run_consumer():
         consumer_running = True
         consumer(consumer_running)
     except Exception as e:
-        logging.error(f"Error in consumer: {e}")
+        print(f"Error in consumer: {e}")
     finally:
         consumer_running = False
 

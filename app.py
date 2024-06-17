@@ -14,7 +14,7 @@ def run_consumer():
     global consumer_running
     try:
         consumer_running = True
-        consumer()
+        consumer(consumer_running)
     except Exception as e:
         logging.error(f"Error in consumer: {e}")
     finally:

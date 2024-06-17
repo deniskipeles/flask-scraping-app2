@@ -243,7 +243,7 @@ def scrape_data(scrape_configuration):
                 'developer_id': scrape_configuration['author_id']
             }
             #print(obj)
-            if content and len(content) > 500:
+            if content and len(content) > 200:
                 results.append(obj)
                 logging.info(f"Scraped data: {obj['title']}")
                 post_data_to_api([obj])

@@ -106,9 +106,10 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
         except requests.RequestException as e:
             logging.error(f"Error posting data for AI: {e}")
     else:
-        logging.error(f"Error processing with Groq API: {response.status_code} - {response.text}")
-        producer([article['id']])
+        print(f"Error processing with Groq API: {response.status_code} - {response.text}")
         time.sleep(5)
+        process_with_groq_api(article)
+        
         
 
 def producer(data):
@@ -134,9 +135,8 @@ def get_data_api(article_id):
         logging.error(f"Error posting data for link {article_id}: {e}")
 
 
-consumer_running = False
+
 def consumer(consumer_running=True):
-    #global consumer_running
 
     connection = pika.BlockingConnection(params)
     channel = connection.channel()

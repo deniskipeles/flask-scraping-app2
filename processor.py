@@ -56,7 +56,7 @@ def generate_title_summary_tags(content, system_prompt_tst, model="gemma-7b-it")
 
 def get_dynamic_content_controller(key, value):
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
-    data = fetch_and_cache(url)
+    data = fetch_and_cache(url,1200)
     return next((item for item in data['items'] if item.get(key) == value), None)
 
 def process_with_groq_api(article, model="mixtral-8x7b-32768"):

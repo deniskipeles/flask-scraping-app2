@@ -60,8 +60,8 @@ def run_scan_and_consumer():
 def scan_and_start_consumer():
     global consumer_running
 
-    if consumer_running:
-        return jsonify({"status": "Consumer is already running, initiating scan"}), 200
+    #if consumer_running:
+    #    return jsonify({"status": "Consumer is already running, initiating scan"}), 200
 
     scan_thread = threading.Thread(target=run_scan_and_consumer)
     scan_thread.start()

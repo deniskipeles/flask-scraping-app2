@@ -13,6 +13,17 @@ from json_utils import extract_json_data
 
 from urllib.parse import urljoin
 
+import re
+
+def extract_time(text):
+    pattern = r"(\d+(?:\.\d+)?)s"
+    match = re.search(pattern, text)
+    if match:
+        time_str = match.group(1)
+        return float(time_str)
+    else:
+        return 5
+
 
 def generate_title_summary_tags(content, system_prompt_tst, model="gemma-7b-it"):
     print('gen tags called')
@@ -107,7 +118,8 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
             logging.error(f"Error posting data for AI: {e}")
     else:
         print(f"Error processing with Groq API: {response.status_code} - {response.text}")
-        time.sleep(5)
+        t = extract_time(response.text)
+        time.sleep(t)
         process_with_groq_api(article)
         
         

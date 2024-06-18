@@ -23,6 +23,21 @@ def extract_time(text):
         return float(time_str)
     else:
         return 5
+        
+def process_text(text):
+    # Split the text into tokens
+    tokens = text.split()
+    
+    # Check if the number of tokens exceeds 4200
+    if len(tokens) > 3200:
+        # Trim the tokens to 4200
+        tokens = tokens[:3200]
+    
+    # Join the tokens back into a single string
+    processed_text = ' '.join(tokens)
+    
+    return processed_text
+    
 
 
 def generate_title_summary_tags(content, system_prompt_tst, model="gemma-7b-it"):
@@ -60,6 +75,7 @@ def get_dynamic_content_controller(key, value):
     return next((item for item in data['items'] if item.get(key) == value), None)
 
 def process_with_groq_api(article, model="mixtral-8x7b-32768"):
+    
     print('proc with groq called')
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -82,10 +98,11 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
 
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
+    c = process_text(article['data'].get("content"))
     data = {
         "messages": [
             {"role": "system", "content": ai_content_system_prompt},
-            {"role": "user", "content": article['data'].get("content")}
+            {"role": "user", "content": c}
         ],
         "model": model,
         "temperature": 1,

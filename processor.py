@@ -29,9 +29,9 @@ def process_text(text):
     tokens = text.split()
     
     # Check if the number of tokens exceeds 4200
-    if len(tokens) > 3200:
+    if len(tokens) > 2500:
         # Trim the tokens to 4200
-        tokens = tokens[:3200]
+        tokens = tokens[:2500]
     
     # Join the tokens back into a single string
     processed_text = ' '.join(tokens)

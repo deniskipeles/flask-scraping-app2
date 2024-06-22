@@ -67,43 +67,49 @@ def scan_and_start_consumer():
     scan_thread.start()
     return jsonify({"status": "Scan initiated and consumer will start if not already running"}), 200
 
-def run_r_data():
-    # Initiate scraping process
-    url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
-    
+def fetch_data(url):
     try:
-        data = fetch_and_cache(url)
-    except Exception as e:
+        return fetch_and_cache(url)
+    except requests.exceptions.RequestException as e:
         print(f"Error fetching data: {e}")
-        return
-    
-    if data:
-        for agent in data.get('items', []):  
-            if agent.get('source') == 'reddit':  
-                subreddit = agent.get('controller', {}).get('subreddit')
-                if subreddit:
+        return None
+
+def process_reddit_data(data):
+    for agent in data.get('items', []):
+        if agent.get('source') == 'reddit':
+            subreddit = agent.get('controller', {}).get('subreddit')
+            if subreddit:
+                try:
+                    posts = fetch_subreddit_posts(subreddit)
+                except Exception as e:
+                    print(f"Error fetching subreddit posts: {e}")
+                    continue
+                
+                for post in posts:
+                    post_obj = {
+                        'link': post.get('name', '') + 'reddit-name',
+                        'title': post.get('title', ''),
+                        'image_links': [],
+                        'content': json.dumps({
+                            'title': post.get('title', ''),
+                            'content': post.get('selftext', ''),
+                            'comments': post.get('comments', [])
+                        }),
+                        'processor': agent.get('id', ''),
+                        'developer_id': agent.get('author_id', '')
+                    }
                     try:
-                        posts = fetch_subreddit_posts(subreddit)
+                        post_data_to_api(post_obj)
                     except Exception as e:
-                        print(f"Error fetching subreddit posts: {e}")
-                        continue
-                    
-                    for post in posts:
-                        obj = {
-                            'link': post.get('name', '') + 'reddit-name',  
-                            'title': post.get('title', ''),  
-                            'image_links': [],
-                            'content': post.get('selftext', '') + (json.dumps({'comments': post.get('comments', [])})),
-                            'processor': agent.get('id', ''),  
-                            'developer_id': agent.get('author_id', '')  
-                        }
-                        try:
-                            post_data_to_api(obj)
-                        except Exception as e:
-                            print(f"Error posting data: {e}")
+                        print(f"Error posting data: {e}")
+
+def run_r_data():
+    url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
+    data = fetch_data(url)
+    if data:
+        process_reddit_data(data)
     else:
         print("No data available")
-
             
 @app.route('/rscan')
 def r_data():

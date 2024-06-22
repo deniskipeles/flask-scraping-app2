@@ -99,6 +99,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
     c = process_text(article['data'].get("content"))
+    model = processor.get('model', model)
     data = {
         "messages": [
             {"role": "system", "content": ai_content_system_prompt},

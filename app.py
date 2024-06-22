@@ -4,6 +4,7 @@ import logging
 import requests
 from processor import consumer, scrape_data
 from fetcher import fetch_and_cache
+from pullpush import fetch_subreddit_posts
 
 app = Flask(__name__)
 
@@ -59,14 +60,26 @@ def run_scan_and_consumer():
 @app.route('/scan')
 def scan_and_start_consumer():
     global consumer_running
-
-    #if consumer_running:
-    #    return jsonify({"status": "Consumer is already running, initiating scan"}), 200
-
+    
     scan_thread = threading.Thread(target=run_scan_and_consumer)
     scan_thread.start()
     return jsonify({"status": "Scan initiated and consumer will start if not already running"}), 200
 
+def run_r_data():
+    # Initiate scraping process
+    url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
+    data = fetch_and_cache(url)
+    if data:
+        for agent in data['items']:
+            if agent['source'] = 'reddit':
+                posts = fetch_subreddit_posts("books")
+                
+            
+@app.route('/rscan')
+def r_data():
+    r_thread = threading.Thread(target=run_r_data)
+    r_thread.start()
+    return jsonify({"status": "r data initiated"}), 200
 
 
 @app.route('/')

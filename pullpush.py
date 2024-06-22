@@ -5,6 +5,8 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 import threading
+from config import GROQ_API_KEY, HEADERS_TO_POST, TEMP_API_URL, params, redis_client
+
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)

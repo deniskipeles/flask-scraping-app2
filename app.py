@@ -87,7 +87,7 @@ def process_reddit_data(data):
                     continue
                 
                 for post in posts:
-                    post_obj = {
+                    post_obj = [{
                         'link': post.get('name', '') + 'reddit-name',
                         'title': post.get('title', ''),
                         'image_links': [],
@@ -98,7 +98,7 @@ def process_reddit_data(data):
                         }),
                         'processor': agent.get('id', ''),
                         'developer_id': agent.get('author_id', '')
-                    }
+                    }]
                     try:
                         post_data_to_api(post_obj)
                     except Exception as e:

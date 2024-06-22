@@ -2,6 +2,7 @@ from flask import Flask, jsonify
 import threading
 import logging
 import requests
+import json
 from processor import consumer, scrape_data
 from fetcher import fetch_and_cache
 from pullpush import fetch_subreddit_posts

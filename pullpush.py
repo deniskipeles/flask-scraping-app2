@@ -53,7 +53,7 @@ def fetch_data_with_proxy(url, headers, proxies, stop_event):
         try:
             response = requests.get(url, proxies=proxy, headers=headers, timeout=5)
             response.raise_for_status()
-            logging.info("Received response from proxy %s", proxy_ip)
+            #logging.info("Received response from proxy %s", proxy_ip)
             result = response.json()
             break
         except requests.exceptions.ProxyError:
@@ -76,7 +76,7 @@ def parallel_fetch(url, headers, proxy_groups):
                 try:
                     result = future.result()
                     if result:
-                        logging.info("Received result: %s", result)
+                        #logging.info("Received result: %s", result)
                         stop_event.set()
                         return result
                 except CancelledError:

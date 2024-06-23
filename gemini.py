@@ -1,7 +1,7 @@
 import requests
 import json
 
-def generate_content(api_key, text):
+def gemini_generate_content(api_key, text):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key={api_key}"
     data = {
         "contents": [{

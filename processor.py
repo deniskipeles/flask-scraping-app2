@@ -7,9 +7,10 @@ import time
 
 from datetime import datetime
 import pika
-from config import GROQ_API_KEY, HEADERS_TO_POST, TEMP_API_URL, params, redis_client
+from config import GROQ_API_KEY, GEMINI_API_KEY, HEADERS_TO_POST, TEMP_API_URL, params, redis_client
 from fetcher import fetch_and_cache, fetch_article_data, find_element, find_elements
 from json_utils import extract_json_data
+from gemini import gemini_generate_content
 
 from urllib.parse import urljoin
 
@@ -22,16 +23,16 @@ def extract_time(text):
         time_str = match.group(1)
         return float(time_str)
     else:
-        return 5
+        return 10
         
-def process_text(text):
+def process_text(text, length):
     # Split the text into tokens
     tokens = text.split()
     
     # Check if the number of tokens exceeds 4200
-    if len(tokens) > 2500:
+    if len(tokens) > length:
         # Trim the tokens to 4200
-        tokens = tokens[:2500]
+        tokens = tokens[:length]
     
     # Join the tokens back into a single string
     processed_text = ' '.join(tokens)
@@ -74,9 +75,11 @@ def get_dynamic_content_controller(key, value):
     data = fetch_and_cache(url,1200)
     return next((item for item in data['items'] if item.get(key) == value), None)
 
-def process_with_groq_api(article, model="mixtral-8x7b-32768"):
-    
+
+
+def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True):
     print('proc with groq called')
+
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -84,7 +87,6 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
     }
 
     print("Article received for processing:")
-    #print(json.dumps(article, indent=2))
 
     if 'data' not in article or 'processor' not in article['data']:
         logging.error("The article's data does not contain required keys.")
@@ -98,27 +100,49 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
 
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
-    c = process_text(article['data'].get("content"))
-    model = processor.get('model', model)
-    data = {
-        "messages": [
-            {"role": "system", "content": ai_content_system_prompt},
-            {"role": "user", "content": c}
-        ],
-        "model": model,
-        "temperature": 1,
-        "max_tokens": 1024,
-        "top_p": 1,
-        "stream": False
-    }
+    txt_context = article['data'].get("content")
+    if change_model:
+        model = processor.get('model', model)
 
-    response = requests.post(url, headers=headers, json=data)
-    if response.status_code == 200:
-        content = response.json()['choices'][0]['message']['content']
+    content = None
+    if model == 'gemini' or len(txt_context.split()) > 2500:
+        text = f"""
+        <prompt>{ai_content_system_prompt}</prompt>
+        <context>{txt_context}</context>
+        """
+        for _ in range(3):
+            content_to_be_checked = gemini_generate_content(GEMINI_API_KEY, text)
+            if content_to_be_checked and len(content_to_be_checked.split()) > 300:
+                content = content_to_be_checked
+                break
+        else:
+            article['data']['content'] = process_text(article['data'].get("content"), 2000)
+            process_with_groq_api(article, "mixtral-8x7b-32768", False)
+    else:
+        data = {
+            "messages": [
+                {"role": "system", "content": ai_content_system_prompt},
+                {"role": "user", "content": txt_context}
+            ],
+            "model": model,
+            "temperature": 1,
+            "max_tokens": 1024,
+            "top_p": 1,
+            "stream": False
+        }
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code == 200:
+            content = response.json()['choices'][0]['message']['content']
+            # Check if the x-ratelimit-remaining-tokens is less than 2200
+            if int(response.headers['x-ratelimit-remaining-tokens']) < 2200:
+                # Wait for x-ratelimit-reset-requests seconds
+                time.sleep(extract_time(response.headers['x-ratelimit-reset-requests']))
+
+    if content:
         system_prompt_tst = processor['ai_tst_system_prompt']
         jsonData = generate_title_summary_tags(content, system_prompt_tst)
         payload = {
-            'id':article['id'],
+            'id': article['id'],
             'title': jsonData.get('title') or article['data'].get('title'),
             'developer_id': processor.get('author_id') or article['data'].get('developer_id'),
             'content': content,
@@ -139,7 +163,8 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768"):
         t = extract_time(response.text)
         time.sleep(t)
         process_with_groq_api(article)
-        
+
+
         
 
 def producer(data):

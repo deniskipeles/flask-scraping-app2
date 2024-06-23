@@ -21,7 +21,7 @@ PROXY_API_URL = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol
 NUM_PROXY_GROUPS = 100
 NUM_COMMENT_PROXY_GROUPS = 100
 MIN_COMMENTS_TO_CACHE = 4
-REDIS_CACHE_EXPIRATION = 3600
+REDIS_CACHE_EXPIRATION = 18000
 
 def fetch_proxies():
     """Fetch a list of proxies from the API."""

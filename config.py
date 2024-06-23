@@ -28,10 +28,12 @@ def flush_keys_containing_pattern(pattern):
         (count, keys) = redis_client.scan(cursor, match=pattern)
         if count == 0:
             break
-        for key in keys:
-            redis_client.delete(key)
-        cursor = keys[-1]
+        if keys:  # Check if the keys list is not empty
+            for key in keys:
+                redis_client.delete(key)
+        cursor = keys[-1] if keys else ''  # Set cursor to an empty string if keys is empty
     print(f"Flushed keys containing the pattern: {pattern}")
+
 
 # RabbitMQ connection
 params = pika.URLParameters(CLOUDAMQP_URL)

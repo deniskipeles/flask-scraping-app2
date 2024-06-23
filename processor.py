@@ -18,7 +18,7 @@ import re
 
 def extract_time(text):
     pattern = r"(\d+(?:\.\d+)?)s"
-    match = re.search(pattern, text)
+    match = re.search(pattern, f"{text}")
     if match:
         time_str = match.group(1)
         return float(time_str)

@@ -22,6 +22,16 @@ REDIS_CACHE_EXPIRATION = 30 * 60  # 30 minutes in seconds
 
 # Initialize Redis
 redis_client = redis.Redis.from_url(REDIS_URL)
+def flush_keys_containing_pattern(pattern):
+    cursor = '0'
+    while True:
+        (count, keys) = redis_client.scan(cursor, match=pattern)
+        if count == 0:
+            break
+        for key in keys:
+            redis_client.delete(key)
+        cursor = keys[-1]
+    print(f"Flushed keys containing the pattern: {pattern}")
 
 # RabbitMQ connection
 params = pika.URLParameters(CLOUDAMQP_URL)

@@ -34,7 +34,7 @@ def flush_keys_containing_pattern(pattern):
         cursor = keys[-1] if keys else ''  # Set cursor to an empty string if keys is empty
     print(f"Flushed keys containing the pattern: {pattern}")
 
-def flush_all:
+def flush_all():
     redis_client.flushall()
     print('flush all vals')
 

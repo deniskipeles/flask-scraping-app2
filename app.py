@@ -7,6 +7,7 @@ from processor import consumer, scrape_data
 from fetcher import fetch_and_cache
 from pullpush import fetch_subreddit_posts
 from processor import post_data_to_api
+from config import flush_keys_containing_pattern
 
 
 app = Flask(__name__)
@@ -118,6 +119,14 @@ def r_data():
     r_thread.start()
     return jsonify({"status": "r data initiated"}), 200
 
+@app.route('/flush-keys', methods=['GET'])
+def flush_keys():
+    pattern = request.args.get('pattern')
+    if pattern is None:
+        return 'Error: pattern is required', 400
+
+    flush_keys_containing_pattern(pattern)
+    return f"Flushed keys containing the pattern: {pattern}"
 
 @app.route('/')
 def hello_world():

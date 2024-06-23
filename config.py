@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 # Configuration
 GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 CLOUDAMQP_URL = os.getenv('CLOUDAMQP_URL', 'amqp://guest:guest@localhost:5672/%2f')
 REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379')
 HEADERS_TO_POST = {

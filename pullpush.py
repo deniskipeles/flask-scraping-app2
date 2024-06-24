@@ -89,7 +89,7 @@ def fetch_comments(post, headers, proxy_groups, min_comments_to_cache):
 def fetch_subreddit_posts(**params):
     """Fetch posts from a subreddit."""
     default_params = {
-        'subreddit': 'your_subreddit',
+        'subreddit': 'books',
         'min_ups': 10,
         'min_comments': 2,
         'min_content_length': 50,

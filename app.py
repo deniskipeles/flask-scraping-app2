@@ -7,8 +7,7 @@ from processor import consumer, scrape_data
 from fetcher import fetch_and_cache
 from pullpush import fetch_subreddit_posts
 from processor import post_data_to_api
-from config import flush_keys_containing_pattern,flush_all
-
+from config import flush_keys_containing_pattern, flush_all
 
 app = Flask(__name__)
 
@@ -21,7 +20,7 @@ def run_consumer():
         consumer_running = True
         consumer(consumer_running)
     except Exception as e:
-        print(f"Error in consumer: {e}")
+        logging.error(f"Error in consumer: {e}")
     finally:
         consumer_running = False
 
@@ -63,8 +62,6 @@ def run_scan_and_consumer():
 
 @app.route('/scan')
 def scan_and_start_consumer():
-    global consumer_running
-    
     scan_thread = threading.Thread(target=run_scan_and_consumer)
     scan_thread.start()
     return jsonify({"status": "Scan initiated and consumer will start if not already running"}), 200
@@ -73,18 +70,18 @@ def fetch_data(url):
     try:
         return fetch_and_cache(url)
     except requests.exceptions.RequestException as e:
-        print(f"Error fetching data: {e}")
+        logging.error(f"Error fetching data: {e}")
         return None
 
 def process_reddit_data(data):
     for agent in data.get('items', []):
         if agent.get('source') == 'reddit':
-            subreddit = agent.get('controller', {}).get('subreddit')
+            subreddit = agent.get('controller', {})
             if subreddit:
                 try:
                     posts = fetch_subreddit_posts(subreddit)
                 except Exception as e:
-                    print(f"Error fetching subreddit posts: {e}")
+                    logging.error(f"Error fetching subreddit posts: {e}")
                     continue
                 
                 for post in posts:
@@ -94,8 +91,8 @@ def process_reddit_data(data):
                         'image_links': [],
                         'content': json.dumps({
                             'title': post.get('title', ''),
-                            'content': post.get('selftext', ''),
-                            'comments': post.get('comments', [])
+                            'content': post.get('content', ''),
+                            'comments': post.get('comments', [])[:50]
                         }),
                         'processor': agent.get('id', ''),
                         'developer_id': agent.get('author_id', '')
@@ -103,7 +100,7 @@ def process_reddit_data(data):
                     try:
                         post_data_to_api(post_obj)
                     except Exception as e:
-                        print(f"Error posting data: {e}")
+                        logging.error(f"Error posting data: {e}")
 
 def run_r_data():
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
@@ -111,8 +108,8 @@ def run_r_data():
     if data:
         process_reddit_data(data)
     else:
-        print("No data available")
-            
+        logging.info("No data available")
+
 @app.route('/rscan')
 def r_data():
     r_thread = threading.Thread(target=run_r_data)
@@ -122,7 +119,7 @@ def r_data():
 @app.route('/flush-keys', methods=['GET'])
 def flush_all_keys():
     flush_all()
-    return f"Flushed all keys the pattern"
+    return "Flushed all keys"
 
 @app.route('/flush')
 def flush_keys():
@@ -136,4 +133,8 @@ def flush_keys():
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    app.run(debug=True)
 

@@ -86,8 +86,8 @@ def fetch_comments(post, headers, proxy_groups, min_comments_to_cache):
         return comments
     return []
 
-def fetch_subreddit_posts(**params):
-    """Fetch posts from a subreddit."""
+def fetch_subreddit_posts(json_params):
+    """Fetch posts from a subreddit using JSON parameters."""
     default_params = {
         'subreddit': 'books',
         'min_ups': 10,
@@ -98,7 +98,11 @@ def fetch_subreddit_posts(**params):
         'min_comments_to_cache': 4,
         'cache_expirations': 18000
     }
-    default_params.update(params)
+
+    # Parse JSON parameters and update the default parameters
+    input_params = json.loads(json_params)
+    default_params.update(input_params)
+
     url = BASE_URL.format(subreddit=default_params['subreddit'])
     proxies_list = fetch_proxies()
     proxy_groups = split_list(proxies_list, default_params['num_proxy_groups'])

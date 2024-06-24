@@ -86,8 +86,8 @@ def fetch_comments(post, headers, proxy_groups, min_comments_to_cache):
         return comments
     return []
 
-def fetch_subreddit_posts(json_params):
-    """Fetch posts from a subreddit using JSON parameters."""
+def fetch_subreddit_posts(params):
+    """Fetch posts from a subreddit using parameters."""
     default_params = {
         'subreddit': 'books',
         'min_ups': 10,
@@ -99,9 +99,8 @@ def fetch_subreddit_posts(json_params):
         'cache_expirations': 18000
     }
 
-    # Parse JSON parameters and update the default parameters
-    input_params = json.loads(json_params)
-    default_params.update(input_params)
+    # Update the default parameters with the provided parameters
+    default_params.update(params)
 
     url = BASE_URL.format(subreddit=default_params['subreddit'])
     proxies_list = fetch_proxies()
@@ -146,4 +145,3 @@ def fetch_subreddit_posts(json_params):
     else:
         logging.error("No data received from parallel fetch")
         return None
-

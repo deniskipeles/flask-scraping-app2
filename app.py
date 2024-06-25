@@ -8,6 +8,7 @@ from fetcher import fetch_and_cache
 from pullpush import fetch_subreddit_posts
 from processor import post_data_to_api
 from config import flush_keys_containing_pattern, flush_all
+import random
 
 app = Flask(__name__)
 
@@ -73,35 +74,48 @@ def fetch_data(url):
         logging.error(f"Error fetching data: {e}")
         return None
 
+
+
 def process_reddit_data(data):
-    for agent in data.get('items', []):
-        if agent.get('source') == 'reddit':
-            subreddit = agent.get('controller', None)
-            if subreddit:
-                print(subreddit)
-                try:
-                    posts = fetch_subreddit_posts(subreddit)
-                except Exception as e:
-                    logging.error(f"Error fetching subreddit posts: {e}:{subreddit}")
-                    continue
-                
-                for post in posts:
-                    post_obj = [{
-                        'link': post.get('name', '') + 'reddit-name',
+    items = data.get('items', [])
+    random.shuffle(items)  # shuffle the list of items
+
+    unique_items = []
+    sub_menu_list_ids = set()
+
+    for agent in items:
+        if agent.get('source') == 'reddit' and agent.get('sub_menu_list_id') not in sub_menu_list_ids:
+            unique_items.append(agent)
+            sub_menu_list_ids.add(agent.get('sub_menu_list_id'))
+
+    for agent in unique_items:
+        subreddit = agent.get('controller', None)
+        if subreddit:
+            
+            try:
+                posts = fetch_subreddit_posts(subreddit)
+            except Exception as e:
+                logging.error(f"Error fetching subreddit posts: {e}:{subreddit}")
+                continue
+            
+            for post in posts:
+                post_obj = [{
+                    'link': post.get('name', '') + 'reddit-name',
+                    'title': post.get('title', ''),
+                    'image_links': [],
+                    'content': json.dumps({
                         'title': post.get('title', ''),
-                        'image_links': [],
-                        'content': json.dumps({
-                            'title': post.get('title', ''),
-                            'content': post.get('content', ''),
-                            'comments': post.get('comments', [])[:50]
-                        }),
-                        'processor': agent.get('id', ''),
-                        'developer_id': agent.get('author_id', '')
-                    }]
-                    try:
-                        post_data_to_api(post_obj)
-                    except Exception as e:
-                        logging.error(f"Error posting data: {e}")
+                        'content': post.get('content', ''),
+                        'comments': post.get('comments', [])[:50]
+                    }),
+                    'processor': agent.get('id', ''),
+                    'developer_id': agent.get('author_id', '')
+                }]
+                try:
+                    post_data_to_api(post_obj)
+                except Exception as e:
+                    logging.error(f"Error posting data: {e}")     
+
 
 def run_r_data():
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"

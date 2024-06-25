@@ -106,7 +106,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         logging.error(f"No processor found for id: {processor_id}")
         return
 
-    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
     text_context = article['data'].get("content")
     if change_model:

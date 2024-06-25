@@ -4,6 +4,7 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 import threading
+from config import redis_client
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)

@@ -76,12 +76,13 @@ def fetch_data(url):
 def process_reddit_data(data):
     for agent in data.get('items', []):
         if agent.get('source') == 'reddit':
-            subreddit = agent.get('controller', {})
+            subreddit = agent.get('controller', None)
             if subreddit:
+                print(subreddit)
                 try:
                     posts = fetch_subreddit_posts(subreddit)
                 except Exception as e:
-                    logging.error(f"Error fetching subreddit posts: {e}")
+                    logging.error(f"Error fetching subreddit posts: {e}:{subreddit}")
                     continue
                 
                 for post in posts:

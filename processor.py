@@ -84,6 +84,12 @@ def get_dynamic_content_controller(key, value):
 
 
 """process with ai logic"""
+
+MAX_CALLS = 20
+PERIOD = 1
+last_call_time = time.time()
+call_count = 0
+
 def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True):
     logging.info('process_with_groq_api called')
 
@@ -105,7 +111,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         logging.error(f"No processor found for id: {processor_id}")
         return
 
-    current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_datetime = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
     text_context = article['data'].get("content")
     if change_model:
@@ -119,8 +125,19 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         payload = create_payload(article, processor, content, json_data)
         post_data(payload)
 
-@rate_limiter.rate_limited
 def make_api_call(url, headers, data):
+    global last_call_time, call_count
+    current_time = time.time()
+    if current_time - last_call_time < PERIOD:
+        call_count += 1
+        if call_count >= MAX_CALLS:
+            time.sleep(PERIOD - (current_time - last_call_time))
+            last_call_time = time.time()
+            call_count = 0
+    else:
+        last_call_time = current_time
+        call_count = 0
+
     response = requests.post(url, headers=headers, json=data)
     response.raise_for_status()
     return response
@@ -182,6 +199,7 @@ def post_data(payload):
             logging.error(f"Error posting data for AI: {e}")
     else:
         logging.error("Failed to post data for AI after 3 attempts")
+
 """end process with ai logic"""
 
 

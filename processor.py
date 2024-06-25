@@ -112,7 +112,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
     if change_model:
         model = processor.get('model', model)
 
-    content = generate_content(model, text_context, ai_content_system_prompt)
+    content = generate_content(model, text_context, ai_content_system_prompt,headers)
 
     if content:
         system_prompt_tst = processor['ai_tst_system_prompt']
@@ -137,7 +137,7 @@ def make_api_call(url, headers, data):
     response.raise_for_status()
     return response
 
-def generate_content(model, text_context, ai_content_system_prompt):
+def generate_content(model, text_context, ai_content_system_prompt, headers):
     if model == 'gemini' or len(text_context.split()) > 2500:
         text = f"""
         <prompt>{ai_content_system_prompt}</prompt>
@@ -149,7 +149,7 @@ def generate_content(model, text_context, ai_content_system_prompt):
                 return content
         else:
             text_context = process_text(text_context, 2000)
-            return generate_content("mixtral-8x7b-32768", text_context, ai_content_system_prompt)
+            return generate_content("mixtral-8x7b-32768", text_context, ai_content_system_prompt, headers)
     else:
         data = {
             "messages": [
@@ -168,7 +168,7 @@ def generate_content(model, text_context, ai_content_system_prompt):
         except requests.RequestException as e:
             logging.error(f"Error processing with Groq API: {e}")
             time.sleep(extract_time(str(e)))
-            return generate_content(model, text_context, ai_content_system_prompt)
+            return generate_content(model, text_context, ai_content_system_prompt, headers)
 
 def create_payload(article, processor, content, json_data):
     return {

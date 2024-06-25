@@ -134,7 +134,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         if response.status_code == 200:
             content = response.json()['choices'][0]['message']['content']
             # Check if the x-ratelimit-remaining-tokens is less than 2200
-            if int(response.headers['x-ratelimit-remaining-tokens']) < 2200:
+            if int(response.headers['x-ratelimit-remaining-tokens']) < 2500:
                 # Wait for x-ratelimit-reset-requests seconds
                 time.sleep(extract_time(response.headers['x-ratelimit-reset-requests']))
 

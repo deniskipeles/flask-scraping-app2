@@ -5,4 +5,3 @@ redis
 pika
 requests
 beautifulsoup4
-ratelimiter

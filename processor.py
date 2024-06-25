@@ -16,6 +16,12 @@ from urllib.parse import urljoin
 
 import re
 
+from ratelimiter import RateLimiter
+
+
+rate_limiter = RateLimiter(max_calls=20, period=1)
+
+
 def extract_time(text):
     pattern = r"(\d+(?:\.\d+)?)s"
     match = re.search(pattern, f"{text}")
@@ -77,8 +83,9 @@ def get_dynamic_content_controller(key, value):
 
 
 
+"""process with ai logic"""
 def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True):
-    print('proc with groq called')
+    logging.info('process_with_groq_api called')
 
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
@@ -86,43 +93,56 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         "Authorization": f"Bearer {GROQ_API_KEY}"
     }
 
-    print("Article received for processing:")
+    logging.info("Article received for processing:")
 
     if 'data' not in article or 'processor' not in article['data']:
         logging.error("The article's data does not contain required keys.")
         return
 
-    id = article['data']['processor']
-    processor = get_dynamic_content_controller('id', id)
+    processor_id = article['data']['processor']
+    processor = get_dynamic_content_controller('id', processor_id)
     if processor is None:
-        logging.error(f"No processor found for id: {id}")
+        logging.error(f"No processor found for id: {processor_id}")
         return
 
     current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     ai_content_system_prompt = processor['ai_content_system_prompt'].replace("___DATETIME___", current_datetime)
-    txt_context = article['data'].get("content")
+    text_context = article['data'].get("content")
     if change_model:
         model = processor.get('model', model)
 
-    content = None
-    if model == 'gemini' or len(txt_context.split()) > 2500:
+    content = generate_content(model, text_context, ai_content_system_prompt)
+
+    if content:
+        system_prompt_tst = processor['ai_tst_system_prompt']
+        json_data = generate_title_summary_tags(content, system_prompt_tst)
+        payload = create_payload(article, processor, content, json_data)
+        post_data(payload)
+
+@rate_limiter.rate_limited
+def make_api_call(url, headers, data):
+    response = requests.post(url, headers=headers, json=data)
+    response.raise_for_status()
+    return response
+
+def generate_content(model, text_context, ai_content_system_prompt):
+    if model == 'gemini' or len(text_context.split()) > 2500:
         text = f"""
         <prompt>{ai_content_system_prompt}</prompt>
-        <context>{txt_context}</context>
+        <context>{text_context}</context>
         """
         for _ in range(3):
-            content_to_be_checked = gemini_generate_content(GEMINI_API_KEY, text)
-            if content_to_be_checked and len(content_to_be_checked.split()) > 300:
-                content = content_to_be_checked
-                break
+            content = gemini_generate_content(GEMINI_API_KEY, text)
+            if content and len(content.split()) > 300:
+                return content
         else:
-            article['data']['content'] = process_text(article['data'].get("content"), 2000)
-            process_with_groq_api(article, "mixtral-8x7b-32768", False)
+            text_context = process_text(text_context, 2000)
+            return generate_content("mixtral-8x7b-32768", text_context, ai_content_system_prompt)
     else:
         data = {
             "messages": [
                 {"role": "system", "content": ai_content_system_prompt},
-                {"role": "user", "content": txt_context}
+                {"role": "user", "content": text_context}
             ],
             "model": model,
             "temperature": 1,
@@ -130,39 +150,39 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
             "top_p": 1,
             "stream": False
         }
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            content = response.json()['choices'][0]['message']['content']
-            # Check if the x-ratelimit-remaining-tokens is less than 2200
-            if int(response.headers['x-ratelimit-remaining-tokens']) < 2500:
-                # Wait for x-ratelimit-reset-requests seconds
-                time.sleep(extract_time(response.headers['x-ratelimit-reset-requests']))
+        try:
+            response = make_api_call("https://api.groq.com/openai/v1/chat/completions", headers, data)
+            return response.json()['choices'][0]['message']['content']
+        except requests.RequestException as e:
+            logging.error(f"Error processing with Groq API: {e}")
+            time.sleep(extract_time(str(e)))
+            return generate_content(model, text_context, ai_content_system_prompt)
 
-    if content:
-        system_prompt_tst = processor['ai_tst_system_prompt']
-        jsonData = generate_title_summary_tags(content, system_prompt_tst)
-        payload = {
-            'id': article['id'],
-            'title': jsonData.get('title') or article['data'].get('title'),
-            'developer_id': processor.get('author_id') or article['data'].get('developer_id'),
-            'content': content,
-            'sub_menu_list_id': processor.get('sub_menu_list_id') or article['data'].get('sub_menu_list_id'),
-            'tags': jsonData.get('tags') or processor.get('tags') or ['news', 'sports', 'politic'],
-            'excerpt': jsonData.get('summary'),
-            'image_links': article['data'].get('image_links')
-        }
-        api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
+def create_payload(article, processor, content, json_data):
+    return {
+        'id': article['id'],
+        'title': json_data.get('title') or article['data'].get('title'),
+        'developer_id': processor.get('author_id') or article['data'].get('developer_id'),
+        'content': content,
+        'sub_menu_list_id': processor.get('sub_menu_list_id') or article['data'].get('sub_menu_list_id'),
+        'tags': json_data.get('tags') or processor.get('tags') or ['news', 'sports', 'politic'],
+        'excerpt': json_data.get('summary'),
+        'image_links': article['data'].get('image_links') or []
+    }
+
+def post_data(payload):
+    api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
+    for _ in range(3):
         try:
             response = requests.post(api_url, json=payload, headers=HEADERS_TO_POST)
             response.raise_for_status()
-            print("Data posted successfully for AI")
+            logging.info("Data posted successfully for AI")
+            break
         except requests.RequestException as e:
             logging.error(f"Error posting data for AI: {e}")
     else:
-        print(f"Error processing with Groq API: {response.status_code} - {response.text}")
-        t = extract_time(response.text)
-        time.sleep(t)
-        process_with_groq_api(article)
+        logging.error("Failed to post data for AI after 3 attempts")
+"""end process with ai logic"""
 
 
         

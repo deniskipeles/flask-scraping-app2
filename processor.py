@@ -16,11 +16,6 @@ from urllib.parse import urljoin
 
 import re
 
-from ratelimiter import RateLimiter
-
-
-rate_limiter = RateLimiter(max_calls=20, period=1)
-
 
 def extract_time(text):
     pattern = r"(\d+(?:\.\d+)?)s"

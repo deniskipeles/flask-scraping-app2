@@ -3,7 +3,7 @@ import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 import threading
-from config import GROQ_API_KEY, HEADERS_TO_POST, TEMP_API_URL, params, redis_client
+from config import params, redis_client
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)
@@ -94,7 +94,6 @@ def fetch_comments(post, headers, proxy_groups, min_comments_to_cache):
             except Exception as e:
                 logging.error(f"Error: {e}")
 
-        # Cache comments if more than MIN_COMMENTS_TO_CACHE comments
         if len(comments) >= min_comments_to_cache:
             redis_client.setex(post["data"]["name"], params['cache_expirations'], json.dumps(comments))
 
@@ -103,23 +102,9 @@ def fetch_comments(post, headers, proxy_groups, min_comments_to_cache):
 
 def fetch_subreddit_posts(params):
     """Fetch posts from a subreddit using parameters."""
-    default_params = {
-        'subreddit': 'your_subreddit',
-        'min_ups': 10,
-        'min_comments': 2,
-        'min_content_length': 50,
-        'num_proxy_groups': 100,
-        'num_comment_proxy_groups': 100,
-        'min_comments_to_cache': 4,
-        'cache_expirations': 18000
-    }
-
-    # Update the default parameters with the provided parameters
-    default_params.update(params)
-
-    url = BASE_URL.format(subreddit=default_params['subreddit'])
+    url = BASE_URL.format(subreddit=params['subreddit'])
     proxies_list = fetch_proxies()
-    proxy_groups = split_list(proxies_list, default_params['num_proxy_groups'])
+    proxy_groups = split_list(proxies_list, params['num_proxy_groups'])
 
     logging.info('Started fetching subreddit posts')
     data = parallel_fetch(url, HEADERS, proxy_groups)
@@ -129,7 +114,7 @@ def fetch_subreddit_posts(params):
         logging.info('Data received from Reddit')
         posts = []
         for post in data["data"]["children"]:
-            if post["data"]["num_comments"] >= default_params['min_comments'] and post["data"]["ups"] >= default_params['min_ups'] and len(post["data"]["selftext"]) >= default_params['min_content_length']:
+            if post["data"]["num_comments"] >= params['min_comments'] and post["data"]["ups"] >= params['min_ups'] and len(post["data"]["selftext"]) >= params['min_content_length']:
                 reddit_data = {
                     "name": post["data"]["name"],
                     "title": post["data"]["title"],
@@ -145,16 +130,16 @@ def fetch_subreddit_posts(params):
                     "permalink": post["data"]["permalink"],
                     "comments": []
                 }
-                if redis_client.exists(post["data"]["name"]) and post["data"]["num_comments"] >= default_params['min_comments_to_cache']:
+                if redis_client.exists(post["data"]["name"]) and post["data"]["num_comments"] >= params['min_comments_to_cache']:
                     cached_comments = json.loads(redis_client.get(post["data"]["name"]))
                     reddit_data["comments"] = cached_comments
-                elif not redis_client.exists(post["data"]["name"]) and post["data"]["num_comments"] >= default_params['min_comments_to_cache']:
+                elif not redis_client.exists(post["data"]["name"]) and post["data"]["num_comments"] >= params['min_comments_to_cache']:
                     comment_proxies_list = fetch_proxies()
-                    comment_proxy_groups = split_list(comment_proxies_list, default_params['num_comment_proxy_groups'])
-                    reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, default_params['min_comments_to_cache'])
-                    if len(reddit_data["comments"]) >= default_params['min_comments_to_cache']:
-                        redis_client.setex(post["data"]["name"], default_params['cache_expirations'], json.dumps(reddit_data["comments"]))
-                if len(reddit_data["comments"]) >= default_params['min_comments_to_cache'] or len(reddit_data["content"]) >= default_params['min_content_length'] or reddit_data["ups"] >= default_params['min_ups']:
+                    comment_proxy_groups = split_list(comment_proxies_list, params['num_comment_proxy_groups'])
+                    reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, params['min_comments_to_cache'])
+                    if len(reddit_data["comments"]) >= params['min_comments_to_cache']:
+                        redis_client.setex(post["data"]["name"], params['cache_expirations'], json.dumps(reddit_data["comments"]))
+                if len(reddit_data["comments"]) >= params['min_comments_to_cache'] or len(reddit_data["content"]) >= params['min_content_length'] or reddit_data["ups"] >= params['min_ups']:
                     posts.append(reddit_data)
         return posts
     else:

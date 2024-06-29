@@ -84,9 +84,9 @@ def process_reddit_data(data):
     sub_menu_list_ids = set()
 
     for agent in items:
-        if agent.get('source') == 'reddit' and agent.get('sub_menu_list_id') not in sub_menu_list_ids:
+        if agent.get('source') == 'reddit' and agent.get('name') not in sub_menu_list_ids:
             unique_items.append(agent)
-            sub_menu_list_ids.add(agent.get('sub_menu_list_id'))
+            sub_menu_list_ids.add(agent.get('name'))
 
     for agent in unique_items:
         subreddit = agent.get('controller', None)
@@ -100,7 +100,7 @@ def process_reddit_data(data):
             
             for post in posts:
                 post_obj = [{
-                    'link': post.get('name', '') + 'reddit-name',
+                    'link': post.get('subreddit', '') + '-' + post.get('name', '') + 'reddit-name',
                     'title': post.get('title', ''),
                     'image_links': [],
                     'content': json.dumps({

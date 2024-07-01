@@ -174,7 +174,7 @@ def create_payload(article, processor, content, json_data):
     return {
         'id': article['id'],
         'title': json_data.get('title') or article['data'].get('title'),
-        'developer_id': processor.get('author_id') or article['data'].get('developer_id'),
+        'author_id': processor.get('author_id') or article['data'].get('developer_id'),
         'content': content,
         'sub_menu_list_id': processor.get('sub_menu_list_id') or article['data'].get('sub_menu_list_id'),
         'tags': json_data.get('tags') or processor.get('tags') or ['news', 'sports', 'politic'],
@@ -316,7 +316,8 @@ def scrape_data(scrape_configuration):
                 'image_links': list(image_links),
                 'content': content,
                 'processor': scrape_configuration['id'],
-                'developer_id': scrape_configuration['author_id']
+                'developer_id': scrape_configuration['author_id'],
+                'author_id': scrape_configuration['author_id']
             }
             #print(obj)
             if content and len(content) > 200:

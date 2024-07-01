@@ -109,7 +109,8 @@ def process_reddit_data(data):
                         'comments': post.get('comments', [])[:50]
                     }),
                     'processor': agent.get('id', ''),
-                    'developer_id': agent.get('author_id', '')
+                    'developer_id': agent.get('author_id', ''),
+                    'author_id': agent.get('author_id', '')
                 }]
                 try:
                     post_data_to_api(post_obj)

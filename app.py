@@ -40,6 +40,7 @@ def hello_world():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    logging.info("Starting Flask app and consumers")
     consumer.data_to_process_consumer_thread.start()
     consumer.scraper_consumer_thread.start()
     app.run(debug=True)

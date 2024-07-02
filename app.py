@@ -1,7 +1,8 @@
+
+from config import flush_keys_containing_pattern, flush_all
 from flask import Flask, request
 import logging
 from processor import producer
-from config import flush_keys_containing_pattern, flush_all
 from fetcher import fetch_and_cache
 import consumer
 
@@ -12,8 +13,7 @@ def agents():
     data = fetch_and_cache(url)
     if data:
         for agent in data['items']:
-            id = agent['id']
-            producer([id])
+            producer(agent['id'])
 
 @app.route('/flush-keys', methods=['GET'])
 def flush_all_keys():
@@ -40,6 +40,7 @@ def hello_world():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    consumer.scraper_consumer_process.start()
-    consumer.data_to_process_consumer_process.start()
+    consumer.data_to_process_consumer_thread.start()
+    consumer.scraper_consumer_thread.start()
     app.run(debug=True)
+

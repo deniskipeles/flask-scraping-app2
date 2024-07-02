@@ -21,7 +21,7 @@ def agents():
     data = fetch_and_cache(url)
     if data:
         for agent in data['items']:
-            producer(agent['id'])
+            producer(agent['id'],'scraper_consumer')
 
 @app.route('/flush-keys', methods=['GET'])
 def flush_all_keys():

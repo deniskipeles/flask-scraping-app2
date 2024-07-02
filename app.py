@@ -4,7 +4,7 @@ from flask import Flask, request
 import logging
 from processor import producer
 from fetcher import fetch_and_cache
-import consumer
+from consumer import scraper_consumer_thread,data_to_process_consumer_thread
 
 app = Flask(__name__)
 
@@ -39,9 +39,19 @@ def hello_world():
     return 'Hello, World!'
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     logging.info("Starting Flask app and consumers")
-    consumer.data_to_process_consumer_thread.start()
-    consumer.scraper_consumer_thread.start()
-    app.run(debug=True)
 
+    try:
+        data_to_process_consumer_thread.start()
+        logging.debug("Started data_to_process_consumer_thread")
+    except Exception as e:
+        logging.error(f"Error starting data_to_process_consumer_thread: {e}")
+
+    try:
+        scraper_consumer_thread.start()
+        logging.debug("Started scraper_consumer_thread")
+    except Exception as e:
+        logging.error(f"Error starting scraper_consumer_thread: {e}")
+
+    app.run(debug=True)

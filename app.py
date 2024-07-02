@@ -13,6 +13,9 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+# Flag to ensure consumers are started only once
+consumers_started = False
+
 def agents():
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
     data = fetch_and_cache(url)
@@ -43,20 +46,23 @@ def scan():
 def hello_world():
     return 'Hello, World!'
 
-@app.before_first_request
+@app.before_request
 def start_consumers():
-    logger.info("Starting consumers before the first request")
-    
-    consumer_threads = [
-        threading.Thread(target=consumer.data_to_process_consumer, name="DataToProcessConsumerThread"),
-        threading.Thread(target=consumer.scraper_consumer, name="ScraperConsumerThread")
-    ]
-    
-    for thread in consumer_threads:
-        thread.start()
-        logger.debug(f"Started {thread.name}")
+    global consumers_started
+    if not consumers_started:
+        logger.info("Starting consumers before the first request")
+        
+        consumer_threads = [
+            threading.Thread(target=consumer.data_to_process_consumer, name="DataToProcessConsumerThread"),
+            threading.Thread(target=consumer.scraper_consumer, name="ScraperConsumerThread")
+        ]
+        
+        for thread in consumer_threads:
+            thread.start()
+            logger.debug(f"Started {thread.name}")
+        
+        consumers_started = True
 
 if __name__ == '__main__':
     logger.info("Starting Flask app")
     app.run(debug=True)
-

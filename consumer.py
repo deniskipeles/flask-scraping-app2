@@ -71,10 +71,10 @@ def scraper_consumer(consumer_running=True):
             data_scraper(body.decode('utf-8'))
             channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
-if __name__ == '__main__':
-    data_to_process_consumer_process = multiprocessing.Process(target=data_to_process_consumer)
-    data_to_process_consumer_process.start()
+#if __name__ == '__main__':
+data_to_process_consumer_process = multiprocessing.Process(target=data_to_process_consumer)
+#    data_to_process_consumer_process.start()
 
-    scraper_consumer_process = multiprocessing.Process(target=scraper_consumer)
-    scraper_consumer_process.start()
+scraper_consumer_process = multiprocessing.Process(target=scraper_consumer)
+#    scraper_consumer_process.start()
 

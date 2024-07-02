@@ -264,7 +264,7 @@ def post_data_to_api(data):
             redis_client.setex(link, 3600, "posted")
             if response.status_code == 200:
                 data_id = response.json()['id']
-                producer([data_id])
+                producer([data_id],'data_to_process_consumer')
             time.sleep(0.1)
         except requests.RequestException as e:
             logging.error(f"Error posting data for link {link}: {e}")

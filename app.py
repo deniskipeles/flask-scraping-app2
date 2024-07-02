@@ -1,4 +1,3 @@
-
 from config import flush_keys_containing_pattern, flush_all
 from flask import Flask, request
 import logging
@@ -21,7 +20,12 @@ def agents():
     data = fetch_and_cache(url)
     if data:
         for agent in data['items']:
-            producer([agent['id']],'scraper_consumer')
+            producer([agent['id']], 'scraper_consumer')
+
+def run_agents_in_background():
+    agents_thread = threading.Thread(target=agents)
+    agents_thread.start()
+    logger.debug("Agents processing started in background")
 
 @app.route('/flush-keys', methods=['GET'])
 def flush_all_keys():
@@ -39,8 +43,8 @@ def flush_keys():
 
 @app.route('/scan', methods=['GET'])
 def scan():
-    agents()
-    return 'Agents initiated'
+    run_agents_in_background()
+    return 'Agents processing started'
 
 @app.route('/')
 def hello_world():
@@ -66,3 +70,4 @@ def start_consumers():
 if __name__ == '__main__':
     logger.info("Starting Flask app")
     app.run(debug=True)
+

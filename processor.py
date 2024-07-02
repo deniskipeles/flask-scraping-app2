@@ -200,15 +200,15 @@ def post_data(payload):
 
         
 
-def producer(data):
+def producer(data,q='hello'):
     connection = pika.BlockingConnection(params)
     channel = connection.channel()
-    channel.queue_declare(queue='hello')
+    channel.queue_declare(queue=q)
 
     for item in data:
-        channel.basic_publish(exchange='', routing_key='hello', body=item)
+        channel.basic_publish(exchange='', routing_key=q, body=item)
 
-    logging.info(f"Sent {len(data)} messages")
+    logging.info(f"Sent {len(data)} {q} messages")
     connection.close()
 
 def get_data_api(article_id):

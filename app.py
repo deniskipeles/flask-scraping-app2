@@ -4,9 +4,14 @@ from flask import Flask, request
 import logging
 from processor import producer
 from fetcher import fetch_and_cache
-from consumer import scraper_consumer_thread,data_to_process_consumer_thread
+import consumer
+import threading
 
 app = Flask(__name__)
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 def agents():
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
@@ -38,20 +43,20 @@ def scan():
 def hello_world():
     return 'Hello, World!'
 
+@app.before_first_request
+def start_consumers():
+    logger.info("Starting consumers before the first request")
+    
+    consumer_threads = [
+        threading.Thread(target=consumer.data_to_process_consumer, name="DataToProcessConsumerThread"),
+        threading.Thread(target=consumer.scraper_consumer, name="ScraperConsumerThread")
+    ]
+    
+    for thread in consumer_threads:
+        thread.start()
+        logger.debug(f"Started {thread.name}")
+
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG)
-    logging.info("Starting Flask app and consumers")
-
-    try:
-        data_to_process_consumer_thread.start()
-        logging.debug("Started data_to_process_consumer_thread")
-    except Exception as e:
-        logging.error(f"Error starting data_to_process_consumer_thread: {e}")
-
-    try:
-        scraper_consumer_thread.start()
-        logging.debug("Started scraper_consumer_thread")
-    except Exception as e:
-        logging.error(f"Error starting scraper_consumer_thread: {e}")
-
+    logger.info("Starting Flask app")
     app.run(debug=True)
+

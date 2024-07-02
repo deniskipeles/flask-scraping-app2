@@ -1,6 +1,7 @@
 from flask import Flask, request
 import logging
-from processor import producer, flush_all, flush_keys_containing_pattern
+from processor import producer
+from config import flush_keys_containing_pattern, flush_all
 from fetcher import fetch_and_cache
 import consumer
 

@@ -1,4 +1,3 @@
-
 import requests
 import json
 import logging
@@ -10,10 +9,11 @@ from config import redis_client
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)
 
 # Configuration
-BASE_URL = "https://reddit.com/r/{subreddit}/new.json"
+BASE_URL = "https://reddit.com/r/{subreddit}/{post_type}.json"
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 PROXY_API_URL = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
 
+# Default agent configuration
 default_agent = {
     "cache_expirations": 3600,
     "min_comments": 10,
@@ -23,7 +23,8 @@ default_agent = {
     "min_score": 80,
     "num_comment_proxy_groups": 100,
     "num_proxy_groups": 100,
-    "subreddit": "news"
+    "subreddit": "news",
+    "post_types": ["new", "hot", "top", "controversial"]
 }
 
 def fetch_proxies():
@@ -108,60 +109,64 @@ def fetch_comments(post, headers, proxy_groups, agent):
                 logging.error(f"Error: {e}")
 
         if len(comments) >= agent["min_comments_to_cache"]:
-            redis_client.setex(post["data"]["name"], agent['cache_expirations'], json.dumps(comments))
+            redis_client.setex(f"comments:{post['data']['name']}", agent['cache_expirations'], json.dumps(comments))
 
         return comments
     return []
 
 def fetch_subreddit_posts(agent=None):
+    """Fetch subreddit posts for all specified post types."""
     if agent is None:
         agent = default_agent
     else:
         agent = {**default_agent, **agent}
-    
-    url = BASE_URL.format(subreddit=agent['subreddit'])
-    proxies_list = fetch_proxies()
-    logging.info(f"Fetched {len(proxies_list)} proxies for URL {url}")
-    proxy_groups = split_list(proxies_list, agent['num_proxy_groups'])
 
-    logging.info('Started fetching subreddit posts')
-    data = parallel_fetch(url, HEADERS, proxy_groups)
-    logging.info('Finished parallel fetch')
+    all_posts = []
 
-    if data:
-        logging.info('Data received from Reddit')
-        posts = []
-        for post in data["data"]["children"]:
-            post_data = post["data"]
-            if post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
-                reddit_data = {
-                    "name": post_data["name"],
-                    "title": post_data["title"],
-                    "author": post_data["author"],
-                    "created_utc": post_data["created_utc"],
-                    "subreddit": post_data["subreddit"],
-                    "content": post_data["selftext"],
-                    "num_comments": post_data["num_comments"],
-                    "ups": post_data["ups"],
-                    "score": post_data["score"],
-                    "link_flair_text": post_data["link_flair_text"],
-                    "url": post_data["url"],
-                    "permalink": post_data["permalink"],
-                    "comments": []
-                }
-                if redis_client.exists(post_data["name"]) and post_data["num_comments"] >= agent['min_comments_to_cache']:
-                    cached_comments = json.loads(redis_client.get(post_data["name"]))
-                    reddit_data["comments"] = cached_comments
-                elif not redis_client.exists(post_data["name"]) and post_data["num_comments"] >= agent['min_comments_to_cache']:
-                    comment_proxies_list = fetch_proxies()
-                    comment_proxy_groups = split_list(comment_proxies_list, agent['num_comment_proxy_groups'])
-                    reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, agent)
-                    if len(reddit_data["comments"]) >= agent['min_comments_to_cache']:
-                        redis_client.setex(post_data["name"], agent['cache_expirations'], json.dumps(reddit_data["comments"]))
-                        #pass
-                if len(reddit_data["comments"]) >= agent['min_comments_to_cache'] or len(reddit_data["content"]) >= agent['min_content_length'] or reddit_data["ups"] >= agent['min_ups']:
-                    posts.append(reddit_data)
-        return posts
-    else:
-        logging.error("No data received from parallel fetch")
-        return []
+    for post_type in agent['post_types']:
+        url = BASE_URL.format(subreddit=agent['subreddit'], post_type=post_type)
+        proxies_list = fetch_proxies()
+        logging.info(f"Fetched {len(proxies_list)} proxies for URL {url}")
+        proxy_groups = split_list(proxies_list, agent['num_proxy_groups'])
+
+        logging.info(f'Started fetching subreddit {post_type} posts')
+        data = parallel_fetch(url, HEADERS, proxy_groups)
+        logging.info('Finished parallel fetch')
+
+        if data:
+            logging.info(f'Data received from Reddit for {post_type}')
+            for post in data["data"]["children"]:
+                post_data = post["data"]
+                if post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
+                    reddit_data = {
+                        "name": post_data["name"],
+                        "title": post_data["title"],
+                        "author": post_data["author"],
+                        "created_utc": post_data["created_utc"],
+                        "subreddit": post_data["subreddit"],
+                        "content": post_data["selftext"],
+                        "num_comments": post_data["num_comments"],
+                        "ups": post_data["ups"],
+                        "score": post_data["score"],
+                        "link_flair_text": post_data["link_flair_text"],
+                        "url": post_data["url"],
+                        "permalink": post_data["permalink"],
+                        "comments": []
+                    }
+                    # Check Redis for a processed flag
+                    if redis_client.exists(f"processed:{post_data['name']}"):
+                        logging.info(f"Post {post_data['name']} already processed.")
+                    else:
+                        if post_data["num_comments"] >= agent['min_comments_to_cache']:
+                            comment_proxies_list = fetch_proxies()
+                            comment_proxy_groups = split_list(comment_proxies_list, agent['num_comment_proxy_groups'])
+                            reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, agent)
+                            if len(reddit_data["comments"]) >= agent['min_comments_to_cache']:
+                                redis_client.setex(f"comments:{post_data['name']}", agent['cache_expirations'], json.dumps(reddit_data["comments"]))
+
+                        if len(reddit_data["comments"]) >= agent['min_comments_to_cache'] or len(reddit_data["content"]) >= agent['min_content_length'] or reddit_data["ups"] >= agent['min_ups']:
+                            all_posts.append(reddit_data)
+                            # Set processed flag in Redis
+                            redis_client.setex(f"processed:{post_data['name']}", agent['cache_expirations'], "1")
+
+    return all_posts

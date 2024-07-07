@@ -6,7 +6,7 @@ import time
 
 from config import params
 from processor import get_data_api, post_data_to_api, scrape_data
-from fetcher import fetch_and_cache,gen_tags
+from fetcher import fetch_and_cache,get_tags
 from pullpush import fetch_subreddit_posts
 
 

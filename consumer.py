@@ -25,11 +25,11 @@ def process_reddit_data(agent=None):
             new_tags = agent.get("tags", [])
             new_tags.extend(subreddit.get("tags", []))
             tags = get_tags(new_tags, base_url)
-            if "url_json_object" in subreddit and "tags" in agent["url_json_object"]:
+            if "url_json_object" in subreddit and "tags" in subreddit["url_json_object"]:
                 subreddit["url_json_object"]["tags"].clear()
-                subreddit["url_json_object"]["tags"] = new_tags
+                subreddit["url_json_object"]["tags"] = tags
             else:
-                subreddit["url_json_object"]["tags"] = new_tags
+                subreddit["url_json_object"] = {**subreddit.get("url_json_object", {}), "tags": tags}
             posts = fetch_subreddit_posts(subreddit)
             logging.debug(f"Fetched posts for subreddit {subreddit}")
         except Exception as e:

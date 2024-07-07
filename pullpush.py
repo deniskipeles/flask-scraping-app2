@@ -1,15 +1,16 @@
+
 import requests
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 import threading
+import urllib.parse
 from config import redis_client
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)
 
 # Configuration
-BASE_URL = "https://reddit.com/r/{subreddit}/{post_type}.json"
 HEADERS = {'User-Agent': 'Mozilla/5.0'}
 PROXY_API_URL = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
 
@@ -24,7 +25,9 @@ default_agent = {
     "num_comment_proxy_groups": 100,
     "num_proxy_groups": 100,
     "subreddit": "news",
-    "post_types": ["new", "hot", "top", "controversial"]
+    "post_types": ["hot"],
+    "url_json_object": {},
+    "max_selftext_words": 500
 }
 
 def fetch_proxies():
@@ -109,10 +112,69 @@ def fetch_comments(post, headers, proxy_groups, agent):
                 logging.error(f"Error: {e}")
 
         if len(comments) >= agent["min_comments_to_cache"]:
-            redis_client.setex(f"comments:{post['data']['name']}", agent['cache_expirations'], json.dumps(comments))
+            redis_client.setex(f"comments:{post['data']['name']}", agent['cache_expirations'], "1")
 
         return comments
     return []
+
+def create_reddit_api_url(json_obj):
+    """
+    Create a dynamic URL to fetch data from the Reddit API.
+
+    Args:
+        json_obj (dict): A JSON object containing the subreddit, limit, tags, sort, t, and comment parameters.
+
+    Returns:
+        str: The dynamic URL to fetch data from the Reddit API.
+    """
+    # Define default values for the JSON object
+    default_json_obj = {
+        "subreddit": "AskReddit",
+        "limit": 50,
+        "tags": [],
+        "sort": "relevance",
+        "t": "year",
+        "comment": None
+    }
+
+    # Merge default values with passed JSON object using spread operator
+    merged_json_obj = {**default_json_obj, **json_obj}
+
+    # Extract values from the merged JSON object
+    subreddit = merged_json_obj["subreddit"]
+    tags = merged_json_obj["tags"]
+    limit = merged_json_obj["limit"]
+    sort = merged_json_obj["sort"]
+    t = merged_json_obj["t"]
+    comment = merged_json_obj.get("comment")
+
+    # Construct the base URL
+    base_url = f"https://oauth.reddit.com/r/{subreddit}/search.json"
+
+    # Initialize the params dictionary with limit, sort, and t parameters
+    params = {
+        "limit": limit,
+        "sort": sort,
+        "t": t
+    }
+
+    # Handle list of list tags
+    if isinstance(tags, list) and all(isinstance(tag, list) for tag in tags):
+        # Join each set of tags with "+" and then join the sets with "|"
+        tag_queries = ["+".join(tag) for tag in tags]
+        params["q"] = "|".join(tag_queries)
+    else:
+        # Join all tags with "+"
+        params["q"] = "+".join(tags)
+
+    # Add the comment parameter if it exists
+    if comment:
+        params["comment"] = comment
+
+    # Construct the final URL by encoding the query parameters and appending them to the base URL
+    url = f"{base_url}?{urllib.parse.urlencode(params)}"
+
+    return url
 
 def fetch_subreddit_posts(agent=None):
     """Fetch subreddit posts for all specified post types."""
@@ -124,49 +186,73 @@ def fetch_subreddit_posts(agent=None):
     all_posts = []
 
     for post_type in agent['post_types']:
-        url = BASE_URL.format(subreddit=agent['subreddit'], post_type=post_type)
-        proxies_list = fetch_proxies()
-        logging.info(f"Fetched {len(proxies_list)} proxies for URL {url}")
-        proxy_groups = split_list(proxies_list, agent['num_proxy_groups'])
+        found_posts = False
+        timeframes = ["hour", "day", "week", "month", "year", "all"]
 
-        logging.info(f'Started fetching subreddit {post_type} posts')
-        data = parallel_fetch(url, HEADERS, proxy_groups)
-        logging.info('Finished parallel fetch')
+        for timeframe in timeframes:
+            print(f"fetching for timeframe {timeframe}")
+            # Use the create_reddit_api_url function to generate the URL
+            url_json_object = agent.get("url_json_object", {})
+            url_json_object["subreddit"] = agent['subreddit']
+            url_json_object["sort"] = post_type
+            url_json_object["t"] = timeframe
+            url = create_reddit_api_url(url_json_object)
 
-        if data:
-            logging.info(f'Data received from Reddit for {post_type}')
-            for post in data["data"]["children"]:
-                post_data = post["data"]
-                if post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
-                    reddit_data = {
-                        "name": post_data["name"],
-                        "title": post_data["title"],
-                        "author": post_data["author"],
-                        "created_utc": post_data["created_utc"],
-                        "subreddit": post_data["subreddit"],
-                        "content": post_data["selftext"],
-                        "num_comments": post_data["num_comments"],
-                        "ups": post_data["ups"],
-                        "score": post_data["score"],
-                        "link_flair_text": post_data["link_flair_text"],
-                        "url": post_data["url"],
-                        "permalink": post_data["permalink"],
-                        "comments": []
-                    }
-                    # Check Redis for a processed flag
-                    if redis_client.exists(f"processed:{post_data['name']}"):
-                        logging.info(f"Post {post_data['name']} already processed.")
-                    else:
-                        if post_data["num_comments"] >= agent['min_comments_to_cache']:
-                            comment_proxies_list = fetch_proxies()
-                            comment_proxy_groups = split_list(comment_proxies_list, agent['num_comment_proxy_groups'])
-                            reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, agent)
-                            if len(reddit_data["comments"]) >= agent['min_comments_to_cache']:
-                                redis_client.setex(f"comments:{post_data['name']}", agent['cache_expirations'], json.dumps(reddit_data["comments"]))
+            proxies_list = fetch_proxies()
+            logging.info(f"Fetched {len(proxies_list)} proxies for URL {url}")
+            proxy_groups = split_list(proxies_list, agent['num_proxy_groups'])
 
-                        if len(reddit_data["comments"]) >= agent['min_comments_to_cache'] or len(reddit_data["content"]) >= agent['min_content_length'] or reddit_data["ups"] >= agent['min_ups']:
-                            all_posts.append(reddit_data)
-                            # Set processed flag in Redis
-                            redis_client.setex(f"processed:{post_data['name']}", agent['cache_expirations'], "1")
+            logging.info(f'Started fetching subreddit {post_type} posts for timeframe {timeframe}')
+            data = parallel_fetch(url, HEADERS, proxy_groups)
+            logging.info('Finished parallel fetch')
+
+            if data:
+                logging.info(f'Data received from Reddit for {post_type} with timeframe {timeframe}')
+                print(len(data["data"]["children"]))
+                for post in data["data"]["children"]:
+                    post_data = post["data"]
+                    if post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
+                        reddit_data = {
+                            "name": post_data["name"],
+                            "title": post_data["title"],
+                            "author": post_data["author"],
+                            "created_utc": post_data["created_utc"],
+                            "subreddit": post_data["subreddit"],
+                            "content": post_data["selftext"],
+                            "num_comments": post_data["num_comments"],
+                            "ups": post_data["ups"],
+                            "score": post_data["score"],
+                            "link_flair_text": post_data["link_flair_text"],
+                            "url": post_data["url"],
+                            "permalink": post_data["permalink"],
+                            "comments": []
+                        }
+                        # Check Redis for a processed flag
+                        if redis_client.exists(f"processed:{post_data['name']}"):
+                            logging.info(f"Post {post_data['name']} already processed.")
+                        else:
+                            word_count = len(post_data["selftext"].split())
+                            if word_count <= agent["max_selftext_words"]:
+                                if post_data["num_comments"] >= agent['min_comments_to_cache']:
+                                    comment_proxies_list = fetch_proxies()
+                                    comment_proxy_groups = split_list(comment_proxies_list, agent['num_comment_proxy_groups'])
+                                    reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, agent)
+
+                                    # if len(reddit_data["comments"]) >= agent['min_comments_to_cache'] or len(reddit_data["content"]) >= agent['min_content_length'] or reddit_data["ups"] >= agent['min_ups']:
+                                    all_posts.append(reddit_data)
+                                    # Set processed flag in Redis
+                                    redis_client.setex(f"processed:{post_data['name']}", agent['cache_expirations'], "1")
+                                    found_posts = True
+                            else:
+                                all_posts.append(reddit_data)
+                                # Set processed flag in Redis
+                                redis_client.setex(f"processed:{post_data['name']}", agent['cache_expirations'], "1")
+                                found_posts = True
+
+                # If we have found unprocessed posts, break the loop to avoid fetching for longer timeframes
+                if found_posts:
+                    break
+            else:
+                logging.warning(f"No data received from Reddit for {post_type} with timeframe {timeframe}")
 
     return all_posts

@@ -6,8 +6,13 @@ import time
 
 from config import params
 from processor import get_data_api, post_data_to_api, scrape_data
-from fetcher import fetch_and_cache
+from fetcher import fetch_and_cache,gen_tags
 from pullpush import fetch_subreddit_posts
+
+
+# Example usage:
+base_url = "https://stories-blog.pockethost.io"
+
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -17,6 +22,14 @@ def process_reddit_data(agent=None):
     subreddit = agent.get('controller', None)
     if subreddit:
         try:
+            new_tags = agent.get("tags", [])
+            new_tags.extend(subreddit.get("tags", []))
+            tags = get_tags(new_tags, base_url)
+            if "url_json_object" in subreddit and "tags" in agent["url_json_object"]:
+                subreddit["url_json_object"]["tags"].clear()
+                subreddit["url_json_object"]["tags"] = new_tags
+            else:
+                subreddit["url_json_object"]["tags"] = new_tags
             posts = fetch_subreddit_posts(subreddit)
             logging.debug(f"Fetched posts for subreddit {subreddit}")
         except Exception as e:

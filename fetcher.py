@@ -99,13 +99,14 @@ def get_tags(tags, base_url):
             logging.debug(f"Cache hit: {tags}")
             return tags_list if len(tags_list)>0 else [[tags]]  # return default pass tags if tags_list is empty
         else:
-            return "Error:", response.status_code
+            return [[tags]]#"Error:", response.status_code
 
     if encoded_url in cache:
-        return cache[encoded_url]
+        res_tags = random.shuffle(cache[encoded_url])
+        return res_tags[:10]
     else:
         result = fetch_tags()
         cache[encoded_url] = result
-        return result
+        return result[:10]
 
 

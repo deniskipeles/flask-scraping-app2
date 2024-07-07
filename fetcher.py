@@ -10,6 +10,11 @@ import urllib.parse
 import random
 from cachetools import TTLCache
 
+#logging.basicConfig(level=logging.DEBUG)
+
+cache = TTLCache(maxsize=128, ttl=300)  # 300 seconds = 5 minutes
+
+
 
 def fetch_and_cache(url, cache_expiration=REDIS_CACHE_EXPIRATION):
     cache_key = f"cache:{url}"
@@ -65,12 +70,6 @@ def find_elements(soup, selectors):
         elements = new_elements
     return elements
 
-
-
-
-logging.basicConfig(level=logging.DEBUG)
-
-cache = TTLCache(maxsize=128, ttl=300)  # 300 seconds = 5 minutes
 
 def get_tags(tags, base_url):
     encoded_url = urllib.parse.quote_plus(str(tags))

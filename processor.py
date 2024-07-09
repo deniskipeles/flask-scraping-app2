@@ -24,7 +24,7 @@ def extract_time(text):
         time_str = match.group(1)
         return float(time_str)
     else:
-        return 10
+        return 50
         
 def process_text(text, length):
     # Split the text into tokens
@@ -167,8 +167,8 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
             return response.json()['choices'][0]['message']['content']
         except requests.RequestException as e:
             logging.error(f"Error processing with Groq API: {e}")
-            time.sleep(extract_time(str(e)))
-            return generate_content(model, text_context, ai_content_system_prompt, headers)
+            time.sleep((extract_time(str(e))+2))
+            return generate_content("llama3-8b-8192", text_context, ai_content_system_prompt, headers)
 
 def create_payload(article, processor, content, json_data):
     return {
@@ -186,9 +186,12 @@ def post_data(payload):
     api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
     for _ in range(3):
         try:
+          if payload["content"] and len(payload["content"]) > 50:
             response = requests.post(api_url, json=payload, headers=HEADERS_TO_POST)
             response.raise_for_status()
             logging.info("Data posted successfully for AI")
+            break
+          else:
             break
         except requests.RequestException as e:
             logging.error(f"Error posting data for AI: {e}")

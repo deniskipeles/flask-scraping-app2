@@ -16,15 +16,26 @@ from urllib.parse import urljoin
 
 import re
 
-
-def extract_time(text):
-    pattern = r"(\d+(?:\.\d+)?)s"
-    match = re.search(pattern, f"{text}")
+def extract_time(time_str):
+    # Match and extract the time in minutes and seconds or just seconds
+    pattern = re.compile(r"(?:(\d+)m)?([\d\.]+)s")
+    match = pattern.match(time_str)
+    
     if match:
-        time_str = match.group(1)
-        return float(time_str)
+        minutes = match.group(1)
+        seconds = match.group(2)
+        
+        # Convert minutes and seconds to total seconds
+        total_seconds = 0
+        if minutes:
+            total_seconds += int(minutes) * 60
+        if seconds:
+            total_seconds += float(seconds)
+        
+        return total_seconds
     else:
         return 50
+
         
 def process_text(text, length):
     # Split the text into tokens
@@ -163,17 +174,23 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
             "stream": False
         }
         try:
-            response = make_api_call("https://api.groq.com/openai/v1/chat/completions", headers, data)
-            return response.json()['choices'][0]['message']['content']
+            #response = make_api_call("https://api.groq.com/openai/v1/chat/completions", headers, data)
+            url="""https://api.groq.com/openai/v1/chat/completions"""
+            response = requests.post(url, headers=headers, json=data)
+            if response.status_code == 200:
+              return response.json()['choices'][0]['message']['content']
+            else:
+              t = response.headers["x-ratelimit-reset-requests"]
+              t = extract_time(str(t))
+              t = t + 2 if t > 5 else 10
+              time.sleep(t)
+              return generate_content(model, repr(text_context), repr(ai_content_system_prompt), headers)
         except requests.RequestException as e:
             logging.error(f"Error processing with Groq API:{model} {e}")
-            t=extract_time(str(e))
-            if t > 5:
-              t = t + 2
-            else:
-              t = 10
+            t = extract_time(str(e))
+            t = t + 2 if t > 5 else 10
             time.sleep(t)
-            return generate_content("llama3-8b-8192", text_context, ai_content_system_prompt, headers)
+            return generate_content(model, repr(text_context), repr(ai_content_system_prompt), headers)
 
 def create_payload(article, processor, content, json_data):
     return {

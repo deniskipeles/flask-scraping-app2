@@ -1,11 +1,14 @@
 
+from config import redis_client
+from fetcher import get_proxy_from_cache
+
 import requests
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
 import threading
 import urllib.parse
-from config import redis_client
+import random
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)
@@ -30,13 +33,15 @@ default_agent = {
     "max_selftext_words": 500
 }
 
+# Load user-agents from file
+with open('user-agents.txt', 'r') as file:
+    user_agents = file.readlines()
+    user_agents = [agent.strip() for agent in user_agents]
+
 def fetch_proxies():
     """Fetch a list of proxies from the API."""
     try:
-        response = requests.get(PROXY_API_URL)
-        response.raise_for_status()
-        proxies_list = [proxy.strip() for proxy in response.text.split('\n') if proxy.strip()]
-        return proxies_list
+        return get_proxy_from_cache()
     except requests.exceptions.RequestException as e:
         logging.error(f"Error fetching proxies: {e}")
         return []
@@ -57,15 +62,22 @@ def fetch_data_with_proxy(url, headers, proxies, stop_event):
             "https": f"http://{proxy_ip}"
         }
 
-        try:
-            response = requests.get(url, proxies=proxy, headers=headers, timeout=5)
-            response.raise_for_status()
-            result = response.json()
+        # Randomly select five user-agents
+        selected_agents = random.sample(user_agents, 5)
+
+        for agent in selected_agents:
+            headers['User-Agent'] = agent
+            try:
+                response = requests.get(url, proxies=proxy, headers=headers, timeout=5)
+                response.raise_for_status()
+                result = response.json()
+                break
+            except requests.exceptions.ProxyError:
+                pass
+            except requests.exceptions.RequestException as e:
+                pass
+        if result:
             break
-        except requests.exceptions.ProxyError:
-            pass
-        except requests.exceptions.RequestException as e:
-            pass
     return result
 
 def parallel_fetch(url, headers, proxy_groups):

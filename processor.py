@@ -166,8 +166,13 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
             response = make_api_call("https://api.groq.com/openai/v1/chat/completions", headers, data)
             return response.json()['choices'][0]['message']['content']
         except requests.RequestException as e:
-            logging.error(f"Error processing with Groq API: {e}")
-            time.sleep((extract_time(str(e))+2))
+            logging.error(f"Error processing with Groq API:{model} {e}")
+            t=extract_time(str(e))
+            if t > 5:
+              t = t + 2
+            else:
+              t = 10
+            time.sleep(t)
             return generate_content("llama3-8b-8192", text_context, ai_content_system_prompt, headers)
 
 def create_payload(article, processor, content, json_data):

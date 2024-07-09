@@ -108,11 +108,11 @@ def get_tags(tags, base_url):
 
     if encoded_url in cache:
         res_tags = random.shuffle(cache[encoded_url])
-        return res_tags[:10]
+        return res_tags[:2]
     else:
         result = fetch_tags()
         cache[encoded_url] = result
-        return result[:10]
+        return result[:2]
 
 
 

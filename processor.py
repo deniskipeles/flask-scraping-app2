@@ -176,7 +176,7 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
             "stream": False
         }
         try:
-            url="""https://api.groq.com/openai/v1/chat/completions"""
+          url="""https://api.groq.com/openai/v1/chat/completions"""
           for _ in range(5):
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:

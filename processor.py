@@ -130,6 +130,8 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         json_data = generate_title_summary_tags(content, system_prompt_tst)
         payload = create_payload(article, processor, content, json_data)
         post_data(payload)
+    else:
+      producer([article["id"]],q='data_to_process_consumer')
 
 def make_api_call(url, headers, data):
     global last_call_time, call_count
@@ -174,17 +176,22 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
             "stream": False
         }
         try:
-            #response = make_api_call("https://api.groq.com/openai/v1/chat/completions", headers, data)
             url="""https://api.groq.com/openai/v1/chat/completions"""
+          for _ in range(5):
             response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
-              return response.json()['choices'][0]['message']['content']
+              res_content = response.json()['choices'][0]['message']['content']
+              if res_content and len(res_content.split()) > 300:
+                return res_content
+              else:
+                time.sleep(10)
             else:
-              t = response.headers["x-ratelimit-reset-requests"]
+              t = response.headers["x-ratelimit-reset-requests"] if response.headers else ""
               t = extract_time(str(t))
               t = t + 2 if t > 5 else 10
               time.sleep(t)
-              return generate_content(model, repr(text_context), repr(ai_content_system_prompt), headers)
+          else:
+              return None
         except requests.RequestException as e:
             logging.error(f"Error processing with Groq API:{model} {e}")
             t = extract_time(str(e))
@@ -196,19 +203,19 @@ def create_payload(article, processor, content, json_data):
     return {
         'id': article['id'],
         'title': json_data.get('title') or article['data'].get('title'),
-        'author_id': processor.get('author_id') or article['data'].get('developer_id'),
+        'author_id': processor.get('author_id') or article['data'].get('developer_id') or processor.get('developer_id') or article['data'].get('author_id'),
         'content': content,
         'sub_menu_list_id': processor.get('sub_menu_list_id') or article['data'].get('sub_menu_list_id'),
-        'tags': json_data.get('tags') or processor.get('tags') or ['news', 'sports', 'politic'],
+        'tags': json_data.get('tags') or processor.get('tags') or ['news', 'sports', 'politics'],
         'excerpt': json_data.get('summary'),
-        'image_links': article['data'].get('image_links') or []
+        'image_links': article['data'].get('image_links',[]) or []
     }
 
 def post_data(payload):
     api_url = 'https://stories-blog.pockethost.io/api/collections/articles/records'
     for _ in range(3):
         try:
-          if payload["content"] and len(payload["content"]) > 50:
+          if payload["content"] and len(payload["content"]) > 500:
             response = requests.post(api_url, json=payload, headers=HEADERS_TO_POST)
             response.raise_for_status()
             logging.info("Data posted successfully for AI")

@@ -3,6 +3,7 @@ import pika
 import json
 import logging
 import time
+import random
 
 from config import params
 from processor import get_data_api, post_data_to_api, scrape_data
@@ -22,9 +23,12 @@ def process_reddit_data(agent=None):
     subreddit = agent.get('controller', None)
     if subreddit:
         try:
-            new_tags = agent.get("tags", [])
-            new_tags.extend(subreddit.get("tags", []))
-            tags = get_tags(new_tags, base_url)
+            search_tags = agent.get("search_tags", [])
+            tags = subreddit.get("tags", []).extend(agent.get("tags", []))
+            if len(search_tags) > 0:
+              tags = random.shuffle(search_tags)[:2]
+            else:
+              tags = random.shuffle(tags)[:4]#get_tags(tags, base_url)
             if "url_json_object" in subreddit and "tags" in subreddit["url_json_object"]:
                 subreddit["url_json_object"]["tags"].clear()
                 subreddit["url_json_object"]["tags"] = tags

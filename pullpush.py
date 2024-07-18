@@ -25,12 +25,13 @@ default_agent = {
     "min_content_length": 1000,
     "min_ups": 20,
     "min_score": 80,
-    "num_comment_proxy_groups": 100,
-    "num_proxy_groups": 100,
+    "num_comment_proxy_groups": 10,
+    "num_proxy_groups": 10,
     "subreddit": "news",
     "post_types": ["hot"],
     "url_json_object": {},
-    "max_selftext_words": 500
+    "max_selftext_words": 300,
+    "timeframes": ["hour", "day", "week"] #["hour", "day", "week", "month", "year", "all"]
 }
 
 # Load user-agents from file
@@ -132,10 +133,8 @@ def fetch_comments(post, headers, proxy_groups, agent):
 def create_reddit_api_url(json_obj):
     """
     Create a dynamic URL to fetch data from the Reddit API.
-
     Args:
         json_obj (dict): A JSON object containing the subreddit, limit, tags, sort, t, and comment parameters.
-
     Returns:
         str: The dynamic URL to fetch data from the Reddit API.
     """
@@ -162,14 +161,13 @@ def create_reddit_api_url(json_obj):
 
     # Construct the base URL
     base_url = f"https://oauth.reddit.com/r/{subreddit}/search.json"
-
     # Initialize the params dictionary with limit, sort, and t parameters
     params = {
         "limit": limit,
         "sort": sort,
         "t": t
     }
-
+    
     # Handle list of list tags
     if isinstance(tags, list) and all(isinstance(tag, list) for tag in tags):
         # Join each set of tags with "+" and then join the sets with "|"
@@ -199,7 +197,7 @@ def fetch_subreddit_posts(agent=None):
 
     for post_type in agent['post_types']:
         found_posts = False
-        timeframes = ["hour", "day", "week", "month", "year", "all"]
+        timeframes = agent.get("timeframes",["week"])
 
         for timeframe in timeframes:
             print(f"fetching for timeframe {timeframe}")

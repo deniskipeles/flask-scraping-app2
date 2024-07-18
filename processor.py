@@ -144,7 +144,7 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         print("Record updated successfully!")
       else:
         print("Error updating record:", response.text)
-      if trial_times < 4:
+      if trial_times < 2:
         producer([id_],q='data_to_process_consumer')
 
 def make_api_call(url, headers, data):

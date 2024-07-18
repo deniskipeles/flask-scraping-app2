@@ -131,7 +131,21 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
         payload = create_payload(article, processor, content, json_data)
         post_data(payload)
     else:
-      producer([article["id"]],q='data_to_process_consumer')
+      id_ = article["id"]
+      trial_times = article.get("trial_times",0)
+      base_url = "https://full-bit.pockethost.io"
+      url = f"{base_url}/api/collections/scrape_data/records/{id_}"
+      payload = {"failed_to_process": True,"trial_times":trial_times+1}
+      headers = {"Content-Type": "application/json"}
+      
+      response = requests.patch(url, json=payload, headers=headers)
+      
+      if response.status_code == 200:
+        print("Record updated successfully!")
+      else:
+        print("Error updating record:", response.text)
+      if trial_times < 4:
+        producer([id_],q='data_to_process_consumer')
 
 def make_api_call(url, headers, data):
     global last_call_time, call_count
@@ -186,7 +200,7 @@ def generate_content(model, text_context, ai_content_system_prompt, headers):
               else:
                 time.sleep(10)
             else:
-              t = response.headers["x-ratelimit-reset-requests"] if response.headers else ""
+              t = response.headers["x-ratelimit-reset-requests"] if response.headers else response.text
               t = extract_time(str(t))
               t = t + 2 if t > 5 else 10
               time.sleep(t)

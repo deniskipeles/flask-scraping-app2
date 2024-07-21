@@ -1,21 +1,16 @@
 
 from config import redis_client
 from fetcher import get_proxy_from_cache
+from proxies import get_fastest_proxies,fetch_proxies
 
 import requests
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed, CancelledError
-import threading
 import urllib.parse
 import random
 
 # Set up logging
 logging.basicConfig(filename='reddit_scraper.log', level=logging.INFO)
-
-# Configuration
-HEADERS = {'User-Agent': 'Mozilla/5.0'}
-PROXY_API_URL = "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all"
 
 # Default agent configuration
 default_agent = {
@@ -25,93 +20,94 @@ default_agent = {
     "min_content_length": 1000,
     "min_ups": 20,
     "min_score": 80,
-    "num_comment_proxy_groups": 10,
-    "num_proxy_groups": 10,
     "subreddit": "news",
     "post_types": ["hot"],
     "url_json_object": {},
-    "max_selftext_words": 300,
-    "timeframes": ["hour", "day", "week"] #["hour", "day", "week", "month", "year", "all"]
+    "max_selftext_words": 500,
+    "timeframes": ["hour", "day", "week"]  # ["hour", "day", "week", "month", "year", "all"]
 }
 
 # Load user-agents from file
-with open('user-agents.txt', 'r') as file:
+path="user-agents.txt"
+with open(path, 'r') as file:
     user_agents = file.readlines()
     user_agents = [agent.strip() for agent in user_agents]
 
-def fetch_proxies():
-    """Fetch a list of proxies from the API."""
+
+def get_fast_proxies():
     try:
-        return get_proxy_from_cache()
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error fetching proxies: {e}")
+        p = redis_client.get("fastest_proxies")
+        if p is None:
+            proxies_list = fetch_proxies()
+            sorted_proxies = get_fastest_proxies(proxies_list)
+            return sorted_proxies
+        p = p.decode('utf-8')
+        p = json.loads(p)
+        return p
+    except redis.exceptions.RedisError as e:
+        print(f"Error connecting to Redis: {e}")
+        return []
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON: {e}")
+        return []
+    except Exception as e:
+        print(f"Unexpected error: {e}")
         return []
 
-def split_list(lst, n):
-    """Split a list into n equal-sized sublists."""
-    k, m = divmod(len(lst), n)
-    return [lst[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n)]
+def scrape_url(proxies, user_agents, url, last_working_proxy=None, max_retries=30):
+    """
+    Scrape a URL using a rotating proxy and user agent.
 
-def fetch_data_with_proxy(url, headers, proxies, stop_event):
-    """Fetch data from a URL using a list of proxies."""
-    result = None
-    for proxy_ip in proxies:
-        if stop_event.is_set():
-            break
-        proxy = {
-            "http": f"http://{proxy_ip}",
-            "https": f"http://{proxy_ip}"
-        }
+    Args:
+        proxies (list): List of proxy URLs
+        user_agents (list): List of user agent strings
+        url (str): URL to scrape
+        last_working_proxy (str, optional): Last working proxy, if any
+        max_retries (int, optional): Maximum number of retries for a single proxy
 
-        # Randomly select five user-agents
-        selected_agents = random.sample(user_agents, 5)
+    Returns:
+        response_text (str): HTML response text
+        last_working_proxy (str): Last working proxy
+    """
+    if last_working_proxy:
+        proxy_index = proxies.index(last_working_proxy) if last_working_proxy in proxies else 0
+    else:
+        proxy_index = 0
 
-        for agent in selected_agents:
-            headers['User-Agent'] = agent
-            try:
-                response = requests.get(url, proxies=proxy, headers=headers, timeout=5)
-                response.raise_for_status()
-                result = response.json()
-                break
-            except requests.exceptions.ProxyError:
-                pass
-            except requests.exceptions.RequestException as e:
-                pass
-        if result:
-            break
-    return result
-
-def parallel_fetch(url, headers, proxy_groups):
-    """Fetch data from a URL using multiple proxy groups in parallel."""
-    stop_event = threading.Event()
-    with ThreadPoolExecutor(max_workers=len(proxy_groups)) as executor:
-        future_to_proxy_group = {executor.submit(fetch_data_with_proxy, url, headers, group, stop_event): group for group in proxy_groups}
-
-        logging.info("Submitted all futures")
+    retries = 0
+    while retries < len(proxies):
+        proxy = proxies[proxy_index]
+        user_agent = random.choice(user_agents)
+        headers = {'User-Agent': user_agent}
+        print(headers)
         try:
-            for future in as_completed(future_to_proxy_group):
-                if stop_event.is_set():
-                    break
-                try:
-                    result = future.result()
-                    if result:
-                        stop_event.set()
-                        return result
-                except CancelledError:
-                    logging.info("Future cancelled: %s", future)
-                except Exception as e:
-                    logging.error(f"Error in future: {e}")
-        except Exception as e:
-            logging.error(f"Error during parallel fetching: {e}")
-    logging.info("No result received")
-    return None
+            response = requests.get(url, proxies={'http': proxy, 'https': proxy}, headers=headers, timeout=10)
+            if response.status_code == 200:
+                logging.info(f"Successful request with proxy {proxy}")
+                data = response.json()
+                
+                return data, proxy
+        except requests.exceptions.RequestException as e:
+            logging.warning(f"Error with proxy {proxy}: {e}")
+            retries += 1
+        proxy_index = (proxy_index + 1) % len(proxies)
 
-def fetch_comments(post, headers, proxy_groups, agent):
-    """Fetch comments for a post using multiple proxy groups in parallel."""
-    comments_url = f"https://oauth.reddit.com/r/{post['data']['subreddit']}/comments/{post['data']['id']}/.json"
-    comments_data = parallel_fetch(comments_url, headers, proxy_groups)
+    logging.error(f"Failed to scrape URL after {max_retries} attempts")
+    proxies_list = fetch_proxies()
+    get_fastest_proxies(proxies_list)
+    
+    return None, None
 
-    if comments_data:
+
+last_working=None
+def fetch_comments(post, user_agents, proxies, agent):
+    """Fetch comments for a post using the scrape_url function."""
+    comments_url = f"https://oauth.reddit.com/r/{post['subreddit']}/comments/{post['id']}/.json"
+    response_text, last_working_ = scrape_url(proxies, user_agents, comments_url)
+    last_working = last_working_
+
+    if response_text:
+        comments_data = response_text  # Parse the JSON response
         comments = []
         for comment in comments_data[1]["data"]["children"]:
             try:
@@ -125,7 +121,7 @@ def fetch_comments(post, headers, proxy_groups, agent):
                 logging.error(f"Error: {e}")
 
         if len(comments) >= agent["min_comments_to_cache"]:
-            redis_client.setex(f"comments:{post['data']['name']}", agent['cache_expirations'], "1")
+            redis_client.setex(f"comments:{post['name']}", agent['cache_expirations'], "1")
 
         return comments
     return []
@@ -143,12 +139,12 @@ def create_reddit_api_url(json_obj):
         "subreddit": "AskReddit",
         "limit": 50,
         "tags": [],
-        "sort": "relevance",
+        "sort": "new",
         "t": "year",
         "comment": None
     }
 
-    # Merge default values with passed JSON object using spread operator
+    # Merge default values with passed JSON object
     merged_json_obj = {**default_json_obj, **json_obj}
 
     # Extract values from the merged JSON object
@@ -167,7 +163,7 @@ def create_reddit_api_url(json_obj):
         "sort": sort,
         "t": t
     }
-    
+
     # Handle list of list tags
     if isinstance(tags, list) and all(isinstance(tag, list) for tag in tags):
         # Join each set of tags with "+" and then join the sets with "|"
@@ -197,7 +193,7 @@ def fetch_subreddit_posts(agent=None):
 
     for post_type in agent['post_types']:
         found_posts = False
-        timeframes = agent.get("timeframes",["week"])
+        timeframes = agent.get("timeframes", ["week"])
 
         for timeframe in timeframes:
             print(f"fetching for timeframe {timeframe}")
@@ -206,23 +202,33 @@ def fetch_subreddit_posts(agent=None):
             url_json_object["subreddit"] = agent['subreddit']
             url_json_object["sort"] = post_type
             url_json_object["t"] = timeframe
-            url = create_reddit_api_url(url_json_object)
 
-            proxies_list = fetch_proxies()
-            logging.info(f"Fetched {len(proxies_list)} proxies for URL {url}")
-            proxy_groups = split_list(proxies_list, agent['num_proxy_groups'])
+            search_tags = agent.get("search_tags", [])
+            random.shuffle(search_tags)
+            url_json_object["tags"] = [search_tags[0]+search_tags[1],search_tags[2]+search_tags[3]]
+
+            url = create_reddit_api_url(url_json_object)
+            print(url)
+
+            proxies_list = get_fast_proxies()
+            print(f"Fetched {len(proxies_list)} proxies for URL {url}")
 
             logging.info(f'Started fetching subreddit {post_type} posts for timeframe {timeframe}')
-            data = parallel_fetch(url, HEADERS, proxy_groups)
-            logging.info('Finished parallel fetch')
+            response_text, last_working_proxy = scrape_url(proxies_list, user_agents, url)
+            last_working = last_working_proxy
 
-            if data:
-                logging.info(f'Data received from Reddit for {post_type} with timeframe {timeframe}')
+            logging.info('Finished fetching')
+
+            if response_text:
+                data = response_text
+                print(f'Data received from Reddit for {post_type} with timeframe {timeframe}')
                 print(len(data["data"]["children"]))
                 for post in data["data"]["children"]:
                     post_data = post["data"]
-                    if post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
+                    print(post_data["title"])
+                    if  len(post_data["selftext"].split()) > agent["max_selftext_words"] or post_data["num_comments"] >= agent['min_comments'] or post_data["ups"] >= agent['min_ups'] or post_data["score"] >= agent['min_score']:
                         reddit_data = {
+                            "id": post_data["id"],
                             "name": post_data["name"],
                             "title": post_data["title"],
                             "author": post_data["author"],
@@ -239,16 +245,14 @@ def fetch_subreddit_posts(agent=None):
                         }
                         # Check Redis for a processed flag
                         if redis_client.exists(f"processed:{post_data['name']}"):
-                            logging.info(f"Post {post_data['name']} already processed.")
+                            print(f"Post {post_data['name']} already processed.")
                         else:
                             word_count = len(post_data["selftext"].split())
-                            if word_count <= agent["max_selftext_words"]:
-                                if post_data["num_comments"] >= agent['min_comments_to_cache']:
-                                    comment_proxies_list = fetch_proxies()
-                                    comment_proxy_groups = split_list(comment_proxies_list, agent['num_comment_proxy_groups'])
-                                    reddit_data["comments"] = fetch_comments(post, HEADERS, comment_proxy_groups, agent)
+                            if word_count <= agent["max_selftext_words"] or post_data["num_comments"] >= agent['min_comments']:
+                                    #if post_data["num_comments"] >= agent['min_comments_to_cache']:
+                                    comment_proxies_list = get_fast_proxies()
+                                    reddit_data["comments"] = fetch_comments(post_data, user_agents, comment_proxies_list, agent)
 
-                                    # if len(reddit_data["comments"]) >= agent['min_comments_to_cache'] or len(reddit_data["content"]) >= agent['min_content_length'] or reddit_data["ups"] >= agent['min_ups']:
                                     all_posts.append(reddit_data)
                                     # Set processed flag in Redis
                                     redis_client.setex(f"processed:{post_data['name']}", agent['cache_expirations'], "1")

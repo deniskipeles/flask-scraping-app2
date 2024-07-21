@@ -5,6 +5,8 @@ from processor import producer
 from fetcher import fetch_and_cache
 import consumer
 import threading
+from proxies import get_fastest_proxies,fetch_proxies
+
 
 app = Flask(__name__)
 
@@ -15,6 +17,13 @@ logger = logging.getLogger(__name__)
 # Flag to ensure consumers are started only once
 consumers_started = False
 
+
+def setup_proxies():
+    # Example usage
+    proxies_list = fetch_proxies()
+    sorted_proxies = get_fastest_proxies(proxies_list)
+    print(sorted_proxies)
+    
 def agents():
     url = "https://stories-blog.pockethost.io/api/collections/scraper_controllers/records"
     data = fetch_and_cache(url)
@@ -22,6 +31,11 @@ def agents():
         for agent in data['items']:
             producer([agent['id']], 'scraper_consumer')
 
+def run_setup_proxies_in_background():
+    proxies_thread = threading.Thread(target=setup_proxies)
+    proxies_thread.start()
+    logger.debug("Proxies processing started in background")
+    
 def run_agents_in_background():
     agents_thread = threading.Thread(target=agents)
     agents_thread.start()
@@ -41,6 +55,11 @@ def flush_keys():
     flush_keys_containing_pattern(pattern)
     return f"Flushed keys containing the pattern: {pattern}"
 
+@app.route('/setup-proxies', methods=['GET'])
+def setup_proxies_api():
+    run_setup_proxies_in_background()
+    return 'Setup-proxies processing started'
+    
 @app.route('/scan', methods=['GET'])
 def scan():
     run_agents_in_background()

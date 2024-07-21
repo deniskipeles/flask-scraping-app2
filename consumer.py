@@ -22,18 +22,14 @@ RETRY_DELAY = 5  # Delay in seconds before retrying a failed connection
 def process_reddit_data(agent=None):
     subreddit = agent.get('controller', None)
     if subreddit:
+        posts = []
         try:
             search_tags = agent.get("search_tags", [])
             tags = subreddit.get("tags", []).extend(agent.get("tags", []))
-            if len(search_tags) > 0:
-              tags = random.shuffle(search_tags)[:2]
-            else:
-              tags = random.shuffle(tags)[:4]#get_tags(tags, base_url)
-            if "url_json_object" in subreddit and "tags" in subreddit["url_json_object"]:
-                subreddit["url_json_object"]["tags"].clear()
-                subreddit["url_json_object"]["tags"] = tags
-            else:
-                subreddit["url_json_object"] = {**subreddit.get("url_json_object", {}), "tags": tags}
+            
+            subreddit["tags"] = tags
+            subreddit["search_tags"] = search_tags
+            subreddit["url_json_object"] = {**subreddit.get("url_json_object", {}), "tags": tags, "search_tags": search_tags}
             posts = fetch_subreddit_posts(subreddit)
             logging.debug(f"Fetched posts for subreddit {subreddit}")
         except Exception as e:
@@ -47,6 +43,7 @@ def process_reddit_data(agent=None):
                 'image_links': [],
                 'content': json.dumps({
                     'title': post.get('title', ''),
+                    'created_utc': post.get('created_utc', ''),
                     'content': post.get('content', ''),
                     'comments': post.get('comments', [])[:50]
                 }),

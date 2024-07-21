@@ -3,6 +3,7 @@ from config import redis_client
 from fetcher import get_proxy_from_cache
 from proxies import get_fastest_proxies,fetch_proxies
 
+import redis
 import requests
 import json
 import logging

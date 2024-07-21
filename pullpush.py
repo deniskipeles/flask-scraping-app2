@@ -138,7 +138,7 @@ def create_reddit_api_url(json_obj):
     # Define default values for the JSON object
     default_json_obj = {
         "subreddit": "AskReddit",
-        "limit": 50,
+        "limit": 20,
         "tags": [],
         "sort": "new",
         "t": "year",

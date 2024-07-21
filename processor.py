@@ -53,8 +53,10 @@ def process_text(text, length):
     
 
 
-def generate_title_summary_tags(content, system_prompt_tst, model="gemma-7b-it"):
+def generate_title_summary_tags(content, system_prompt_tst, model=None):
     print('gen tags called')
+    if not model:
+      model="gemma-7b-it"
     url = "https://api.groq.com/openai/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
@@ -127,7 +129,8 @@ def process_with_groq_api(article, model="mixtral-8x7b-32768", change_model=True
 
     if content:
         system_prompt_tst = processor['ai_tst_system_prompt']
-        json_data = generate_title_summary_tags(content, system_prompt_tst)
+        model_tst = processor['tst_model']
+        json_data = generate_title_summary_tags(content, system_prompt_tst,model_tst)
         payload = create_payload(article, processor, content, json_data)
         post_data(payload)
     else:
@@ -165,7 +168,7 @@ def make_api_call(url, headers, data):
     return response
 
 def generate_content(model, text_context, ai_content_system_prompt, headers):
-    if model == 'gemini' or len(text_context.split()) > 2500:
+    if model == 'gemini' or len(text_context.split()) > 2000:
         text = f"""
         <prompt>{ai_content_system_prompt}</prompt>
         <context>{text_context}</context>

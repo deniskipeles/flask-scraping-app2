@@ -122,6 +122,6 @@ def get_fastest_proxies(proxies_list):
 
     fastest_proxies = [proxy for proxy, _ in results]
 
-    redis_client.set(redis_key, 7200, json.dumps(fastest_proxies))
+    redis_client.setex(redis_key, 7200, json.dumps(fastest_proxies))
 
     return fastest_proxies

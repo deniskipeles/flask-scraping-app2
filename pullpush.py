@@ -104,7 +104,7 @@ last_working=None
 def fetch_comments(post, user_agents, proxies, agent):
     """Fetch comments for a post using the scrape_url function."""
     comments_url = f"https://oauth.reddit.com/r/{post['subreddit']}/comments/{post['id']}/.json"
-    response_text, last_working_ = scrape_url(proxies, user_agents, comments_url)
+    response_text, last_working_ = scrape_url(proxies, user_agents, comments_url, last_working)
     last_working = last_working_
 
     if response_text:
@@ -142,7 +142,9 @@ def create_reddit_api_url(json_obj):
         "tags": [],
         "sort": "new",
         "t": "year",
-        "comment": None
+        "default_params": {
+          "restrict_sr":"on"
+        }
     }
 
     # Merge default values with passed JSON object
@@ -154,7 +156,7 @@ def create_reddit_api_url(json_obj):
     limit = merged_json_obj["limit"]
     sort = merged_json_obj["sort"]
     t = merged_json_obj["t"]
-    comment = merged_json_obj.get("comment")
+    default_params = merged_json_obj.get("default_params",{})
 
     # Construct the base URL
     base_url = f"https://oauth.reddit.com/r/{subreddit}/search.json"
@@ -162,21 +164,22 @@ def create_reddit_api_url(json_obj):
     params = {
         "limit": limit,
         "sort": sort,
-        "t": t
+        "t": t,
+        "restrict_sr":"on"
     }
 
     # Handle list of list tags
     if isinstance(tags, list) and all(isinstance(tag, list) for tag in tags):
         # Join each set of tags with "+" and then join the sets with "|"
-        tag_queries = ["+".join(tag) for tag in tags]
+        tag_queries = ["|".join(tag) for tag in tags]
         params["q"] = "|".join(tag_queries)
     else:
         # Join all tags with "+"
-        params["q"] = "+".join(tags)
+        params["q"] = "|".join(tags)
 
     # Add the comment parameter if it exists
-    if comment:
-        params["comment"] = comment
+    if default_params:
+        params = {**params, **default_params}
 
     # Construct the final URL by encoding the query parameters and appending them to the base URL
     url = f"{base_url}?{urllib.parse.urlencode(params)}"
@@ -206,7 +209,7 @@ def fetch_subreddit_posts(agent=None):
 
             search_tags = agent.get("search_tags", [])
             random.shuffle(search_tags)
-            url_json_object["tags"] = [search_tags[0]+search_tags[1],search_tags[2]+search_tags[3]]
+            url_json_object["tags"] = search_tags[0]
 
             url = create_reddit_api_url(url_json_object)
             print(url)
@@ -215,7 +218,7 @@ def fetch_subreddit_posts(agent=None):
             print(f"Fetched {len(proxies_list)} proxies for URL {url}")
 
             logging.info(f'Started fetching subreddit {post_type} posts for timeframe {timeframe}')
-            response_text, last_working_proxy = scrape_url(proxies_list, user_agents, url)
+            response_text, last_working_proxy = scrape_url(proxies_list, user_agents, url, last_working)
             last_working = last_working_proxy
 
             logging.info('Finished fetching')

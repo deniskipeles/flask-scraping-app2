@@ -1,6 +1,6 @@
 
 from config import redis_client
-from fetcher import get_proxy_from_cache
+from fetcher import get_proxy_from_cache,fetch_api_endpoints,get_tags
 from proxies import get_fastest_proxies,fetch_proxies
 
 import redis
@@ -269,8 +269,44 @@ def fetch_subreddit_posts(agent=None):
 
                 # If we have found unprocessed posts, break the loop to avoid fetching for longer timeframes
                 if found_posts:
+                    try:
+                      sub=agent['subreddit']
+                      BASE_URL_ = "https://stories-blog.pockethost.io"
+                      m=get_tags([sub], BASE_URL_)
+                      q=join_list_or_list_of_lists(m[0])
+                      params={"q": q, "subreddit": sub, "size": agent.get("pullpush_size", 10), "num_comments>": agent.get("pullpush_num_comments", 20), "score>": agent.get("pullpush_score",20)}
+                      comments_params={"size": agent.get("pullpush_comments_size", 20)}
+                      pullpush=fetch_api_endpoints("pullpush")
+                      # Stringified version of the code
+                      code_string = pullpush[0].get("function") if len(pullpush) > 0 else None
+                      # Lambda function to execute the stringified code
+                      execute_code = lambda params, comments_params, code: (exec(code), fetch_reddit_data(params, comments_params))[1]
+                      result = execute_code(params, comments_params, code_string)
+                      if isinstance(result,list):
+                        all_posts.extend(result)
+                        print(f"pullpush {len(result)} results")
+                    except Exception as e:
+                      logging.error(f"Error: {e}")
                     break
             else:
                 logging.warning(f"No data received from Reddit for {post_type} with timeframe {timeframe}")
 
     return all_posts
+
+
+
+def join_list_or_list_of_lists(input_list):
+    if not isinstance(input_list, list):
+        raise ValueError("Input must be a list or a list of lists")
+    
+    result = []
+    for item in input_list:
+        if isinstance(item, list):
+            result.extend(item)
+        else:
+            result.append(item)
+    
+    return ' OR '.join(str(x) for x in result)
+
+
+

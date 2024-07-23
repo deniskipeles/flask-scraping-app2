@@ -100,12 +100,12 @@ def scrape_url(proxies, user_agents, url, last_working_proxy=None, max_retries=3
     return None, None
 
 
-last_working=None
+#last_working=None
 def fetch_comments(post, user_agents, proxies, agent):
     """Fetch comments for a post using the scrape_url function."""
     comments_url = f"https://oauth.reddit.com/r/{post['subreddit']}/comments/{post['id']}/.json"
-    response_text, last_working_ = scrape_url(proxies, user_agents, comments_url, last_working)
-    last_working = last_working_
+    response_text, last_working_ = scrape_url(proxies, user_agents, comments_url)
+    #last_working = last_working_
 
     if response_text:
         comments_data = response_text  # Parse the JSON response
@@ -218,8 +218,8 @@ def fetch_subreddit_posts(agent=None):
             print(f"Fetched {len(proxies_list)} proxies for URL {url}")
 
             logging.info(f'Started fetching subreddit {post_type} posts for timeframe {timeframe}')
-            response_text, last_working_proxy = scrape_url(proxies_list, user_agents, url, last_working)
-            last_working = last_working_proxy
+            response_text, last_working_proxy = scrape_url(proxies_list, user_agents, url)
+            #last_working = last_working_proxy
 
             logging.info('Finished fetching')
 

@@ -159,7 +159,7 @@ def create_reddit_api_url(json_obj):
     default_params = merged_json_obj.get("default_params",{})
 
     # Construct the base URL
-    base_url = f"https://oauth.reddit.com/r/{subreddit}/search.json"
+    base_url = f"https://oauth.reddit.com/r/{subreddit}/{sort}.json"
     # Initialize the params dictionary with limit, sort, and t parameters
     params = {
         "limit": limit,
@@ -171,11 +171,11 @@ def create_reddit_api_url(json_obj):
     # Handle list of list tags
     if isinstance(tags, list) and all(isinstance(tag, list) for tag in tags):
         # Join each set of tags with "+" and then join the sets with "|"
-        tag_queries = ["|".join(tag) for tag in tags]
-        params["q"] = "|".join(tag_queries)
+        tag_queries = ["||".join(tag) for tag in tags]
+        params["q"] = "||".join(tag_queries)
     else:
         # Join all tags with "+"
-        params["q"] = "|".join(tags)
+        params["q"] = "||".join(tags)
 
     # Add the comment parameter if it exists
     if default_params:
@@ -209,7 +209,7 @@ def fetch_subreddit_posts(agent=None):
 
             search_tags = agent.get("search_tags", [])
             random.shuffle(search_tags)
-            url_json_object["tags"] = search_tags[0]
+            url_json_object["tags"] = search_tags[:3]
 
             url = create_reddit_api_url(url_json_object)
             print(url)

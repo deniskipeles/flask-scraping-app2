@@ -193,7 +193,7 @@ def fetch_subreddit_posts(agent=None):
     else:
         agent = {**default_agent, **agent}
 
-    all_posts = []
+    all_posts = fetch_pullpush_results(agent)
 
     for post_type in agent['post_types']:
         found_posts = False
@@ -269,24 +269,6 @@ def fetch_subreddit_posts(agent=None):
 
                 # If we have found unprocessed posts, break the loop to avoid fetching for longer timeframes
                 if found_posts:
-                    try:
-                      sub=agent['subreddit']
-                      BASE_URL_ = "https://stories-blog.pockethost.io"
-                      m=get_tags([sub], BASE_URL_)
-                      q=join_list_or_list_of_lists(m[0])
-                      params={"q": q, "subreddit": sub, "size": agent.get("pullpush_size", 10), "num_comments>": agent.get("pullpush_num_comments", 20), "score>": agent.get("pullpush_score",20)}
-                      comments_params={"size": agent.get("pullpush_comments_size", 20)}
-                      pullpush=fetch_api_endpoints("pullpush")
-                      # Stringified version of the code
-                      code_string = pullpush[0].get("function") if len(pullpush) > 0 else None
-                      # Lambda function to execute the stringified code
-                      execute_code = lambda params, comments_params, code: (exec(code), fetch_reddit_data(params, comments_params))[1]
-                      result = execute_code(params, comments_params, code_string)
-                      if isinstance(result,list):
-                        all_posts.extend(result)
-                        print(f"pullpush {len(result)} results")
-                    except Exception as e:
-                      logging.error(f"Error: {e}")
                     break
             else:
                 logging.warning(f"No data received from Reddit for {post_type} with timeframe {timeframe}")
@@ -294,6 +276,10 @@ def fetch_subreddit_posts(agent=None):
     return all_posts
 
 
+def execute_code(params, comments_params, code):
+    local_vars = {}
+    exec(code, globals(), local_vars)
+    return local_vars['fetch_reddit_data'](params, comments_params)
 
 def join_list_or_list_of_lists(input_list):
     if not isinstance(input_list, list):
@@ -309,4 +295,42 @@ def join_list_or_list_of_lists(input_list):
     return ' OR '.join(str(x) for x in result)
 
 
+def fetch_pullpush_results(agent):
+    """
+    Fetches pullpush results based on the agent's configuration.
 
+    Args:
+        agent (dict): Agent configuration
+        all_posts (list): List to extend with the fetched results
+
+    Returns:
+        list: Fetched pullpush results
+    """
+    if agent["fetch_pullpush"]:
+        try:
+            sub = agent['subreddit']
+            BASE_URL_ = "https://stories-blog.pockethost.io"
+            m = get_tags([sub], BASE_URL_)
+            q = join_list_or_list_of_lists(m[0])
+            params = {
+                "q": q,
+                "subreddit": sub,
+                "size": agent.get("pullpush_size", 10),
+                "num_comments>": agent.get("pullpush_num_comments", 20),
+                "score>": agent.get("pullpush_score", 20)
+            }
+            comments_params = {"size": agent.get("pullpush_comments_size", 20)}
+            pullpush = fetch_api_endpoints("pullpush")
+            code_string = pullpush[0].get("function") if len(pullpush) > 0 else None
+            execute_code_lambda = lambda params, comments_params, code: execute_code(params, comments_params, code)
+            result = execute_code_lambda(params, comments_params, code_string)
+            if isinstance(result, list):
+                #all_posts.extend(result)
+                print(f"pullpush {len(result)} results")
+                return result
+            return []
+        except Exception as e:
+            logging.error(f"Error: {e}")
+            return []
+    else:
+      return []
